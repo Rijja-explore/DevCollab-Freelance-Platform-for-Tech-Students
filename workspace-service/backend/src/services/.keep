@@ -1,0 +1,4 @@
+// Services contain business logic and orchestration
+// They interact with models, external APIs, and other services
+// Services should be independent and testable
+// Services should NOT depend on HTTP context (req/res)

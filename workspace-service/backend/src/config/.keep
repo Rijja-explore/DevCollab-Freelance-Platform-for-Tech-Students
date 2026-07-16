@@ -1,0 +1,4 @@
+// Config modules handle environment setup and external service connections
+// Examples: database connections, Redis initialization, environment loader
+// Connections should be initialized here and exported for use in services
+// DO NOT connect directly inside routes or services

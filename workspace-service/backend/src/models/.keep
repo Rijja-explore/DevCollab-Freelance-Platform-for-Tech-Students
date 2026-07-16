@@ -1,0 +1,4 @@
+// Models define data schemas using Mongoose
+// Each model represents a document type in MongoDB
+// Models should only contain schema definition and basic validation
+// Complex business logic belongs in services, not models
