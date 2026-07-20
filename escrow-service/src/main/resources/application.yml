@@ -1,0 +1,153 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: escrow-service
+
+  # ─────────────────────────────────────────────────────────
+  #  Datasource
+  # ─────────────────────────────────────────────────────────
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:escrow_db}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:escrow_user}
+    password: ${DB_PASSWORD:escrow_pass}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: EscrowHikariPool
+
+  # ─────────────────────────────────────────────────────────
+  #  JPA / Hibernate
+  # ─────────────────────────────────────────────────────────
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  # ─────────────────────────────────────────────────────────
+  #  Flyway
+  # ─────────────────────────────────────────────────────────
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+  # ─────────────────────────────────────────────────────────
+  #  RabbitMQ
+  # ─────────────────────────────────────────────────────────
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: /
+    listener:
+      simple:
+        acknowledge-mode: manual
+        retry:
+          enabled: true
+          initial-interval: 1000ms
+          max-attempts: 3
+          multiplier: 2.0
+        prefetch: 10
+    template:
+      retry:
+        enabled: true
+        initial-interval: 1000ms
+        max-attempts: 3
+
+  # ─────────────────────────────────────────────────────────
+  #  Jackson
+  # ─────────────────────────────────────────────────────────
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+    time-zone: UTC
+
+# ─────────────────────────────────────────────────────────
+#  JWT (RS256) — Public Key from Service A's JWKS
+# ─────────────────────────────────────────────────────────
+jwt:
+  public-key: ${JWT_PUBLIC_KEY:classpath:keys/public.pem}
+  issuer: ${JWT_ISSUER:devcollab-auth}
+  expiration-ms: 3600000
+
+# ─────────────────────────────────────────────────────────
+#  Razorpay
+# ─────────────────────────────────────────────────────────
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:rzp_test_placeholder}
+  key-secret: ${RAZORPAY_KEY_SECRET:placeholder_secret}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:placeholder_webhook_secret}
+  currency: INR
+
+# ─────────────────────────────────────────────────────────
+#  DevCollab Escrow Config
+# ─────────────────────────────────────────────────────────
+escrow:
+  exchange: devcollab.events
+  queues:
+    project-matched: q.project.matched
+    milestone-completed: q.milestone.completed
+  routing-keys:
+    project-matched: project.matched
+    milestone-completed: milestone.completed
+    payment-released: payment.released
+    payment-failed: payment.failed
+  dlx:
+    exchange: devcollab.events.dlx
+    queue: q.dead.letter
+
+# ─────────────────────────────────────────────────────────
+#  Actuator
+# ─────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  health:
+    rabbitmq:
+      enabled: true
+
+# ─────────────────────────────────────────────────────────
+#  SpringDoc / Swagger UI
+# ─────────────────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+    try-it-out-enabled: true
+
+logging:
+  level:
+    com.devcollab.escrow: DEBUG
+    org.springframework.amqp: INFO
+    org.springframework.security: INFO
+    org.flywaydb: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n"

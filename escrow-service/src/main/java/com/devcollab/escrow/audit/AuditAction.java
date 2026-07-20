@@ -1,0 +1,33 @@
+package com.devcollab.escrow.audit;
+
+public enum AuditAction {
+    // Contract actions
+    CONTRACT_CREATED,
+    CONTRACT_ACTIVATED,
+    CONTRACT_COMPLETED,
+    CONTRACT_CANCELLED,
+    CONTRACT_DISPUTED,
+
+    // Milestone actions
+    MILESTONE_CREATED,
+    MILESTONE_SUBMITTED,
+    MILESTONE_APPROVED,
+    MILESTONE_REJECTED,
+    MILESTONE_DISPUTED,
+
+    // Payment actions
+    PAYMENT_INITIATED,
+    PAYMENT_RELEASED,
+    PAYMENT_FAILED,
+    PAYMENT_REFUNDED,
+
+    // Webhook actions
+    WEBHOOK_RECEIVED,
+    WEBHOOK_VERIFIED,
+    WEBHOOK_REJECTED,
+
+    // System events
+    EVENT_CONSUMED,
+    EVENT_PUBLISHED,
+    DUPLICATE_EVENT_IGNORED
+}

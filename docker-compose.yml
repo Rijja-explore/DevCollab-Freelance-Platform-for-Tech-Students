@@ -1,0 +1,127 @@
+version: "3.9"
+
+services:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  #  MySQL
+  # ─────────────────────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: devcollab-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: escrow_db
+      MYSQL_USER: escrow_user
+      MYSQL_PASSWORD: escrow_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "escrow_user", "-pescrow_pass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - devcollab-network
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  #  RabbitMQ
+  # ─────────────────────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: devcollab-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - devcollab-network
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  #  Escrow Service (Spring Boot)
+  # ─────────────────────────────────────────────────────────────────────────────
+  escrow-service:
+    build:
+      context: ./escrow-service
+      dockerfile: Dockerfile
+    container_name: devcollab-escrow-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: escrow_db
+      DB_USERNAME: escrow_user
+      DB_PASSWORD: escrow_pass
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-classpath:keys/public.pem}
+      JWT_ISSUER: devcollab-auth
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./escrow-service/src/main/resources/keys:/app/keys:ro
+    networks:
+      - devcollab-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  #  Escrow Frontend (React + Vite)
+  # ─────────────────────────────────────────────────────────────────────────────
+  escrow-frontend:
+    build:
+      context: ./escrow-frontend
+      dockerfile: Dockerfile
+    container_name: devcollab-escrow-frontend
+    restart: unless-stopped
+    depends_on:
+      escrow-service:
+        condition: service_healthy
+    environment:
+      VITE_API_BASE_URL: http://escrow-service:8080
+    ports:
+      - "5173:80"
+    networks:
+      - devcollab-network
+
+volumes:
+  mysql_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+
+networks:
+  devcollab-network:
+    driver: bridge
+    name: devcollab-network

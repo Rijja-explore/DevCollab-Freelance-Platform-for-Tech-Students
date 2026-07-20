@@ -1,0 +1,190 @@
+# ==================== FRONTEND ASSETS ====================
+frontend/public/sdg*.png
+frontend/src/assets/*.png
+
+# ==================== IMAGE FILES (served separately or via CDN) ====================
+*.png
+*.jpg
+*.jpeg
+
+# ==================== NODE MODULES ====================
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# ==================== ENVIRONMENT VARIABLES (SECURITY CRITICAL) ====================
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+.env.secrets
+.secret
+render.secret
+render.env
+
+# ==================== PYTHON VIRTUAL ENVIRONMENTS ====================
+venv/
+ENV/
+env/
+.venv
+infra/
+.env
+python-env/
+
+# ==================== PYTHON BUILD & PACKAGING ====================
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+*.whl
+*.pyc
+*.pyo
+*.so
+
+# ==================== PYTHON CACHE ====================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ==================== TEST & COVERAGE REPORTS ====================
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+*.cover
+coverage.xml
+*.log
+
+# ==================== IDE / EDITOR ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ==================== BUILD & COMPILED FILES ====================
+frontend/build/
+frontend/dist/
+frontend/.cache/
+client/build/
+build/
+dist/
+
+# ==================== TEMPORARY FILES ====================
+*.tmp
+*.temp
+*.cache
+*.bak
+*.swp
+.turbo/
+.next/
+
+# ==================== GENERATED MODEL FILES ====================
+*.h5
+*.pkl
+*.joblib
+*.onnx
+*.tflite
+
+# ==================== DATA FILES (Temporary Outputs) ====================
+uploads/
+temp/
+tmp/
+*.csv
+
+# ==================== MODEL TRAINING ARTIFACTS ====================
+# Exclude training outputs and intermediate files (not needed for inference)
+segmentation_model/*.png
+segmentation_model/*.jpg
+segmentation_model/*.jpeg
+segmentation_model/events.out.tfevents.*
+runs/
+*.tfevents.*
+uploads/*
+!uploads/.gitkeep
+segmentation_outputs/
+segmented_portions/
+processed_overlay.png
+
+# ==================== SYSTEM FILES ====================
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+.Icon?
+ehthumbs.db
+
+# ==================== LOCAL DEVELOPMENT ====================
+local/
+*.local
+debug.log
+.env.development.local
+
+# ==================== DOCKER ====================
+.dockerignore
+docker-compose.override.yml
+
+# ==================== GIT ====================
+.gitkeep
+.git/
+!.github/
+.gitmodules
+
+# ==================== PACKAGE MANAGER LOCK FILES ====================
+# Uncomment if using lock files for reproducibility
+# package-lock.json
+# yarn.lock
+# Pipfile.lock
+
+
+# ML Models (too large)
+*.pt
+*.h5
+*.pth
+runs/
+segmentation_outputs/
+segmented_portions/
+
+# Temporary Files
+uploads/
+temp/
+tmp/
+*.tmp
+logs/
+*.log
+server_output.log
+
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+
+# Sensitive Information
+*secret*
+*credentials*
+*key.pem
+*key.pub
+*access_key*
+
+# Keep templates (DON'T ignore these)
+!.env.example
+!render.env
