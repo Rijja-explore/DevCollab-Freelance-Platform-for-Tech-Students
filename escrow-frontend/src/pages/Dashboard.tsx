@@ -4,9 +4,12 @@ import {
   Clock,
   CheckCircle,
   TrendingUp,
-  DollarSign,
   ArrowRight,
   ShieldCheck,
+  Zap,
+  ArrowUpRight,
+  Activity,
+  Radio,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -16,16 +19,22 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
   PieChart,
   Pie,
+  Cell,
 } from 'recharts';
 import { StatCard } from '../components/StatCard';
 import { contractsApi, transactionsApi, auditApi } from '../api/client';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
+
+const chartTooltipStyle = {
+  backgroundColor: '#0c1019',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: '12px',
+  color: '#f1f5f9',
+  fontSize: '12px',
+};
 
 export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState({
@@ -37,7 +46,6 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
 
-  // Static mock data for beautiful financial visuals
   const paymentHistoryData = [
     { name: 'Jan', amount: 4000 },
     { name: 'Feb', amount: 7500 },
@@ -48,17 +56,16 @@ export const Dashboard: React.FC = () => {
   ];
 
   const milestoneStatusData = [
-    { name: 'Released', value: 45, color: '#10b981' },
-    { name: 'Submitted', value: 20, color: '#0ea5e9' },
-    { name: 'Pending', value: 30, color: '#f59e0b' },
-    { name: 'Failed/Disputed', value: 5, color: '#f43f5e' },
+    { name: 'Released', value: 45, color: '#06d6a0' },
+    { name: 'Submitted', value: 20, color: '#38bdf8' },
+    { name: 'Pending', value: 30, color: '#fbbf24' },
+    { name: 'Disputed', value: 5, color: '#ff6b6b' },
   ];
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        // Parallel requests
         const [contractsRes, transactionsRes, auditRes] = await Promise.all([
           contractsApi.getAll(0, 1),
           transactionsApi.getAll(0, 1),
@@ -68,18 +75,16 @@ export const Dashboard: React.FC = () => {
         const contractTotal = contractsRes.data?.data?.totalElements ?? 0;
         const txTotal = transactionsRes.data?.data?.totalElements ?? 0;
 
-        // Calculate sample stats from mock data fallback or live if present
         setStats({
           totalContracts: contractTotal || 12,
           pendingMilestones: 4,
           releasedPayments: txTotal || 18,
-          totalRevenue: 85200, // mock INR
+          totalRevenue: 85200,
         });
 
         setRecentLogs(auditRes.data?.data?.content ?? []);
       } catch (err) {
         console.error('Failed to load dashboard metrics, showing fallbacks', err);
-        // Resilient Fallback stats for beautiful UI even if DB starts empty
         setStats({
           totalContracts: 15,
           pendingMilestones: 6,
@@ -94,103 +99,133 @@ export const Dashboard: React.FC = () => {
     fetchDashboardData();
   }, []);
 
+  const quickLinks = [
+    { to: '/contracts', label: 'New Contract', icon: FileText, color: 'text-vault-teal' },
+    { to: '/milestones', label: 'Review Milestones', icon: Clock, color: 'text-vault-amber' },
+    { to: '/transactions', label: 'View Payments', icon: TrendingUp, color: 'text-vault-violet' },
+  ];
+
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div className="page-header">
-        <h1 className="page-title">Escrow Management Dashboard</h1>
-        <p className="page-subtitle">Real-time status of DevCollab match contracts, escrowed funds, and audit trail.</p>
+    <div className="space-y-8 animate-slide-up">
+      {/* Hero banner */}
+      <div className="relative overflow-hidden rounded-2xl border border-surface-border bg-hero-gradient p-6 md:p-8">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-vault-teal/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 w-48 h-48 bg-vault-violet/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-vault-teal/10 border border-vault-teal/20 text-vault-teal text-xs font-semibold mb-4">
+              <Activity className="w-3.5 h-3.5" />
+              Escrow vault is active
+            </div>
+            <h1 className="font-display text-3xl md:text-4xl font-bold text-white tracking-tight">
+              Welcome to{' '}
+              <span className="gradient-text">DevCollab Vault</span>
+            </h1>
+            <p className="text-slate-400 text-sm mt-3 max-w-lg leading-relaxed">
+              Monitor escrow contracts, milestone releases, and Razorpay payments — all in one secure dashboard for startup–student collaborations.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {quickLinks.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-surface-border hover:border-vault-teal/30 hover:bg-vault-teal/5 text-sm font-medium text-slate-300 hover:text-white transition-all group"
+              >
+                <link.icon className={`w-4 h-4 ${link.color}`} />
+                {link.label}
+                <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </Link>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats bento grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
         <StatCard
           title="Total Contracts"
           value={stats.totalContracts}
           description="Matched from Service A"
           icon={FileText}
           loading={loading}
+          accent="teal"
           trend={{ value: '+12%', isPositive: true }}
         />
         <StatCard
           title="Pending Milestones"
           value={stats.pendingMilestones}
-          description="In review / work submitted"
+          description="Awaiting review"
           icon={Clock}
           loading={loading}
-          trend={{ value: '4 actions required', isPositive: false }}
+          accent="amber"
+          trend={{ value: '4 actions', isPositive: false }}
         />
         <StatCard
           title="Released Payments"
           value={stats.releasedPayments}
-          description="Transacted via Razorpay"
+          description="Via Razorpay"
           icon={CheckCircle}
           loading={loading}
+          accent="violet"
           trend={{ value: '+28%', isPositive: true }}
         />
         <StatCard
-          title="Total Revenue (INR)"
+          title="Total Volume"
           value={`₹${stats.totalRevenue.toLocaleString('en-IN')}`}
-          description="Total payout volume escrowed"
+          description="Escrowed INR"
           icon={TrendingUp}
           loading={loading}
+          accent="coral"
           trend={{ value: '+18.5%', isPositive: true }}
         />
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Monthly Payment Chart */}
-        <div className="card p-6 lg:col-span-2 flex flex-col justify-between h-96">
-          <div className="flex items-center justify-between mb-4">
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="card-glow p-6 lg:col-span-2 flex flex-col h-[380px]">
+          <div className="flex items-start justify-between mb-6">
             <div>
-              <h3 className="text-base font-semibold text-white">Monthly Released Payments</h3>
-              <p className="text-xs text-slate-500">Escrow volumes distributed over time</p>
+              <h3 className="font-display font-semibold text-white text-lg">Payment Volume</h3>
+              <p className="text-xs text-slate-500 mt-1">Monthly escrow releases (INR)</p>
             </div>
-            <div className="flex items-center gap-1 text-xs font-semibold text-brand-400">
-              <DollarSign className="w-3.5 h-3.5" />
-              INR Volume (Paise Converted)
-            </div>
+            <span className="text-xs font-semibold text-vault-teal bg-vault-teal/10 px-2.5 py-1 rounded-lg">
+              Last 6 months
+            </span>
           </div>
 
-          <div className="flex-1 w-full min-h-[250px]">
+          <div className="flex-1 w-full min-h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={paymentHistoryData}>
                 <defs>
-                  <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                  <linearGradient id="tealGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#06d6a0" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#06d6a0" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="name" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: '#f8fafc',
-                  }}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="name" stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={chartTooltipStyle} />
                 <Area
                   type="monotone"
                   dataKey="amount"
-                  stroke="#0ea5e9"
-                  strokeWidth={2}
+                  stroke="#06d6a0"
+                  strokeWidth={2.5}
                   fillOpacity={1}
-                  fill="url(#colorAmount)"
+                  fill="url(#tealGradient)"
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Milestone Status Distribution */}
-        <div className="card p-6 flex flex-col justify-between h-96">
-          <div>
-            <h3 className="text-base font-semibold text-white">Milestone Status</h3>
-            <p className="text-xs text-slate-500">State of matching milestone payments</p>
+        <div className="card p-6 flex flex-col h-[380px]">
+          <div className="mb-4">
+            <h3 className="font-display font-semibold text-white text-lg">Milestone Mix</h3>
+            <p className="text-xs text-slate-500 mt-1">Status distribution</p>
           </div>
 
           <div className="flex-1 flex items-center justify-center min-h-[180px]">
@@ -200,36 +235,30 @@ export const Dashboard: React.FC = () => {
                   data={milestoneStatusData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
+                  innerRadius={55}
+                  outerRadius={78}
+                  paddingAngle={4}
                   dataKey="value"
+                  stroke="none"
                 >
                   {milestoneStatusData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: '#f8fafc',
-                  }}
-                />
+                <Tooltip contentStyle={chartTooltipStyle} />
               </PieChart>
             </ResponsiveContainer>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            {milestoneStatusData.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {milestoneStatusData.map((item) => (
+              <div key={item.name} className="flex items-center gap-2">
                 <span
-                  className="w-2.5 h-2.5 rounded-full inline-block"
+                  className="w-2 h-2 rounded-full flex-shrink-0"
                   style={{ backgroundColor: item.color }}
-                ></span>
-                <span className="text-xs text-slate-400">
-                  {item.name} ({item.value}%)
+                />
+                <span className="text-[11px] text-slate-400 truncate">
+                  {item.name} · {item.value}%
                 </span>
               </div>
             ))}
@@ -237,98 +266,99 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Audit Logs / Activity Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Audit Log Activity */}
-        <div className="card p-6 lg:col-span-2 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-base font-semibold text-white">Audit Trail Summary</h3>
-                <p className="text-xs text-slate-500">Latest immutable financial and match actions logged</p>
-              </div>
-              <Link
-                to="/audit-logs"
-                className="text-xs font-semibold text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors"
-              >
-                View Full Log <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+      {/* Activity + Events */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="card-glow p-6 lg:col-span-2">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h3 className="font-display font-semibold text-white text-lg">Recent Activity</h3>
+              <p className="text-xs text-slate-500 mt-1">Immutable audit trail</p>
             </div>
+            <Link
+              to="/audit-logs"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-vault-teal hover:text-emerald-300 transition-colors"
+            >
+              Full log <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
 
-            <div className="space-y-4">
-              {recentLogs.length > 0 ? (
-                recentLogs.map((logItem: any) => (
-                  <div
-                    key={logItem.id}
-                    className="flex items-start gap-4 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors"
-                  >
-                    <div className="p-2 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-400">
-                      <ShieldCheck className="w-4 h-4" />
+          <div className="space-y-3">
+            {recentLogs.length > 0 ? (
+              recentLogs.map((logItem: any) => (
+                <div
+                  key={logItem.id}
+                  className="flex items-start gap-4 p-4 rounded-xl bg-white/[0.02] border border-surface-border hover:border-vault-teal/15 hover:bg-vault-teal/[0.02] transition-all"
+                >
+                  <div className="p-2 rounded-lg bg-vault-teal/10 border border-vault-teal/20 text-vault-teal flex-shrink-0">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-slate-200 truncate">
+                        {logItem.action.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-[10px] text-slate-600 flex-shrink-0">
+                        {format(new Date(logItem.createdAt), 'MMM dd, HH:mm')}
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-200">
-                          {logItem.action.replace(/_/g, ' ')}
-                        </span>
-                        <span className="text-[10px] text-slate-500">
-                          {format(new Date(logItem.createdAt), 'MMM dd, HH:mm')}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1 truncate">
-                        {logItem.description}
-                      </p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded text-slate-400">
-                          Actor: {logItem.actor}
-                        </span>
-                        <span className="text-[10px] text-slate-500">
-                          {logItem.entityType} ID: {logItem.entityId.slice(0, 8)}...
-                        </span>
-                      </div>
+                    <p className="text-xs text-slate-500 mt-1 truncate">{logItem.description}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-[10px] bg-white/[0.04] px-2 py-0.5 rounded-md text-slate-500">
+                        {logItem.actor}
+                      </span>
+                      <span className="text-[10px] text-slate-600 font-mono">
+                        {logItem.entityType} · {logItem.entityId.slice(0, 8)}…
+                      </span>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-8 text-xs text-slate-500">
-                  No match or transaction logs recorded yet.
                 </div>
-              )}
-            </div>
+              ))
+            ) : (
+              <div className="text-center py-10 text-sm text-slate-500">
+                No audit events recorded yet.
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Quick Matched Contracts Status */}
-        <div className="card p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-semibold text-white mb-4">Quick Integration Guide</h3>
-            <div className="space-y-4 text-xs text-slate-400">
-              <p className="leading-relaxed">
-                As part of the <strong>DevCollab</strong> architecture, this payment gateway listens to match triggers via RabbitMQ.
-              </p>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 p-2 bg-white/5 rounded-lg border border-white/5">
-                  <span className="px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-400 font-semibold text-[10px]">
-                    INCOMING
-                  </span>
-                  <code className="text-slate-300">project.matched</code>
-                </div>
-                <div className="flex items-center gap-2 p-2 bg-white/5 rounded-lg border border-white/5">
-                  <span className="px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-400 font-semibold text-[10px]">
-                    INCOMING
-                  </span>
-                  <code className="text-slate-300">milestone.completed</code>
-                </div>
-                <div className="flex items-center gap-2 p-2 bg-white/5 rounded-lg border border-white/5">
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">
-                    OUTGOING
-                  </span>
-                  <code className="text-slate-300">payment.released</code>
-                </div>
+        {/* Event bus panel */}
+        <div className="card p-6 flex flex-col">
+          <div className="flex items-center gap-2 mb-5">
+            <Radio className="w-4 h-4 text-vault-violet" />
+            <h3 className="font-display font-semibold text-white text-lg">Event Bus</h3>
+          </div>
+
+          <p className="text-xs text-slate-500 leading-relaxed mb-5">
+            DevCollab microservices communicate via RabbitMQ. This escrow service listens and emits payment events.
+          </p>
+
+          <div className="space-y-2.5 flex-1">
+            {[
+              { dir: 'IN', event: 'project.matched', color: 'vault-teal' },
+              { dir: 'IN', event: 'milestone.completed', color: 'vault-teal' },
+              { dir: 'OUT', event: 'payment.released', color: 'vault-violet' },
+            ].map((item) => (
+              <div
+                key={item.event}
+                className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-surface-border"
+              >
+                <span
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                    item.dir === 'IN'
+                      ? 'bg-vault-teal/10 text-vault-teal'
+                      : 'bg-vault-violet/10 text-vault-violet'
+                  }`}
+                >
+                  {item.dir}
+                </span>
+                <code className="text-xs text-slate-300 font-mono truncate">{item.event}</code>
               </div>
-              <p className="leading-relaxed text-[11px] text-slate-500">
-                Startup actions create payment intent tokens locally and call Razorpay. Captures are verified automatically using signature verify filters.
-              </p>
-            </div>
+            ))}
+          </div>
+
+          <div className="mt-5 pt-4 border-t border-surface-border flex items-center gap-2 text-[11px] text-slate-600">
+            <Zap className="w-3.5 h-3.5 text-vault-amber" />
+            Razorpay signatures verified on capture
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 
 interface ToastContextType {
@@ -16,9 +16,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     toast(msg, {
       icon: '⚠️',
       style: {
-        background: '#1e293b',
-        color: '#f59e0b',
-        border: '1px solid #334155',
+        background: '#0c1019',
+        color: '#fbbf24',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '12px',
       },
     });
 
@@ -28,20 +29,21 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         position="top-right"
         toastOptions={{
           style: {
-            background: '#0f172a',
-            color: '#cbd5e1',
-            border: '1px solid #1e293b',
+            background: '#0c1019',
+            color: '#e2e8f0',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '12px',
           },
           success: {
             iconTheme: {
-              primary: '#10b981',
-              secondary: '#0f172a',
+              primary: '#06d6a0',
+              secondary: '#0c1019',
             },
           },
           error: {
             iconTheme: {
-              primary: '#ef4444',
-              secondary: '#0f172a',
+              primary: '#ff6b6b',
+              secondary: '#0c1019',
             },
           },
         }}
