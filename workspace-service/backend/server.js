@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import createApp from './src/app.js';
 import { connectDatabase } from './src/config/database.js';
 import { initializeRedis } from './src/config/redis.js';
+import { validateEnvironment } from './src/config/environment.js';
 import { logger } from './src/utils/logger.js';
 
 /**
@@ -42,6 +43,8 @@ const startServer = async () => {
   try {
     logger.info('🚀 Starting Workspace Service...');
     logger.info(`📍 Environment: ${NODE_ENV}`);
+
+    validateEnvironment();
 
     // Connect to MongoDB
     logger.info('🗄️  Connecting to MongoDB...');

@@ -43,3 +43,8 @@ docker-compose.override.yml
 # Logs
 logs/
 *.log
+
+# Authentication Keys (DO NOT COMMIT)
+# Private key is for development/testing only
+# Public key can be committed for local dev
+backend/keys/private.pem

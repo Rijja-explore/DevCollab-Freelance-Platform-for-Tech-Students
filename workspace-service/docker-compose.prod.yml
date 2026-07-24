@@ -2,7 +2,7 @@ services:
   # MongoDB Database
   mongodb:
     image: mongo:7.0
-    container_name: workspace-mongodb
+    container_name: workspace-mongodb-prod
     ports:
       - "27017:27017"
     environment:
@@ -18,11 +18,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: workspace-redis
+    container_name: workspace-redis-prod
     ports:
       - "6379:6379"
     volumes:
@@ -34,17 +35,18 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
-  # Backend Service (Development Mode)
+  # Backend Service (Production Mode)
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile  # Uses development Dockerfile with all dependencies
-    container_name: workspace-backend
+      dockerfile: Dockerfile.prod  # Uses production Dockerfile with optimized build
+    container_name: workspace-backend-prod
     ports:
       - "5000:5000"
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       PORT: 5000
       MONGO_URI: mongodb://root:password@mongodb:27017/workspace-service?authSource=admin
       REDIS_URL: redis://redis:6379
@@ -55,32 +57,28 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-      - /app/node_modules  # Anonymous volume to preserve container's node_modules
     networks:
       - workspace-network
-    command: npm run dev  # Uses nodemon for hot reloading
+    restart: unless-stopped
+    # No volumes in production - code is baked into the image
 
-  # Frontend Service (Development Mode)
+  # Frontend Service (Production Mode)
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile  # Uses development Dockerfile with all dependencies
-    container_name: workspace-frontend
+      dockerfile: Dockerfile.prod  # Uses production Dockerfile with built static files
+    container_name: workspace-frontend-prod
     ports:
       - "3000:3000"
     environment:
-      VITE_API_URL: http://localhost:5000  # Use localhost for browser access (not container name)
+      VITE_API_URL: http://localhost:5000  # Configure for your production domain
       VITE_SOCKET_URL: http://localhost:5000
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules  # Anonymous volume to preserve container's node_modules
     networks:
       - workspace-network
-    command: npm run dev  # Uses Vite dev server with hot reloading
+    restart: unless-stopped
+    # No volumes in production - built files are baked into the image
 
 volumes:
   mongodb_data:

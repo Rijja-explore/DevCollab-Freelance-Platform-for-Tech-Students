@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
+import apiRoutes from './routes/index.js';
 
 /**
  * Express Application Factory
@@ -41,12 +42,14 @@ const createApp = () => {
     });
   });
 
+  // API Routes
+  app.use('/api', apiRoutes);
+
   // 404 handler for undefined routes
   app.use((req, res) => {
     res.status(404).json({
-      error: 'Not Found',
-      message: `Route ${req.method} ${req.path} not found`,
-      timestamp: new Date().toISOString(),
+      success: false,
+      message: `Route ${req.method} ${req.path} not found`
     });
   });
 

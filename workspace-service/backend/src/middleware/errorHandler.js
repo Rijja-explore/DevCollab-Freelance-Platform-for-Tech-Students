@@ -24,14 +24,18 @@ export const errorHandler = (err, req, res, next) => {
     error: err,
   });
 
-  // Send error response
-  res.status(status).json({
-    error: true,
-    status,
-    message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-    timestamp: new Date().toISOString(),
-  });
+  // Send error response in consistent format
+  const response = {
+    success: false,
+    message
+  };
+
+  // Add stack trace in development
+  if (process.env.NODE_ENV === 'development') {
+    response.stack = err.stack;
+  }
+
+  res.status(status).json(response);
 };
 
 /**

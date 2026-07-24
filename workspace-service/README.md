@@ -52,9 +52,37 @@ cd frontend
 npm install
 npm run dev
 
-# Using Docker Compose
+# Using Docker Compose (Development)
 docker-compose up
+
+# Using Docker Compose (Production)
+docker-compose -f docker-compose.prod.yml up
 ```
+
+## Development vs Production Docker Setup
+
+### Development Mode (Hot Reloading)
+```bash
+# Start development environment with hot reloading
+docker-compose up
+
+# Or build and start
+docker-compose up --build
+```
+- Uses `Dockerfile` (includes dev dependencies)
+- Mounts source code as volumes for hot reloading
+- Runs `npm run dev` (nodemon + vite dev server)
+- Supports real-time code changes
+
+### Production Mode (Optimized Build)
+```bash
+# Start production environment
+docker-compose -f docker-compose.prod.yml up --build
+```
+- Uses `Dockerfile.prod` (production-only dependencies)
+- No volume mounts (code baked into images)
+- Runs `npm start` (production server + static files)
+- Optimized for performance and security
 
 ## Project Structure
 

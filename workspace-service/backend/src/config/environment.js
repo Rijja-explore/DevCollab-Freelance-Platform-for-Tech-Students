@@ -12,12 +12,14 @@ const REQUIRED_ENV_VARS = [
   'NODE_ENV',
   'MONGO_URI',
   'REDIS_URL',
+  'JWT_PUBLIC_KEY_PATH',
 ];
 
 const OPTIONAL_ENV_VARS = {
   CORS_ORIGIN: '*',
   LOG_LEVEL: 'info',
-  JWT_PUBLIC_KEY_URL: null,
+  JWT_PUBLIC_KEY_PATH: process.env.JWT_PUBLIC_KEY_PATH,
+  JWT_ALGORITHM: process.env.JWT_ALGORITHM || 'RS256',
   RABBITMQ_URL: null,
 };
 
@@ -58,7 +60,8 @@ export const getConfig = () => {
     REDIS_URL: process.env.REDIS_URL,
     CORS_ORIGIN: process.env.CORS_ORIGIN || OPTIONAL_ENV_VARS.CORS_ORIGIN,
     LOG_LEVEL: process.env.LOG_LEVEL || OPTIONAL_ENV_VARS.LOG_LEVEL,
-    JWT_PUBLIC_KEY_URL: process.env.JWT_PUBLIC_KEY_URL,
+    JWT_PUBLIC_KEY_PATH: process.env.JWT_PUBLIC_KEY_PATH,
+    JWT_ALGORITHM: process.env.JWT_ALGORITHM || 'RS256',
     RABBITMQ_URL: process.env.RABBITMQ_URL,
   };
 };
