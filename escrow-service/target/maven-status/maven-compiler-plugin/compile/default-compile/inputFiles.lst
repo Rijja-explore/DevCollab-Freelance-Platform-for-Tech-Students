@@ -1,3 +1,4 @@
+D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\config\DevSecurityConfig.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\enums\ContractStatus.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\events\MilestoneCompletedEvent.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\repository\TransactionRepository.java
@@ -16,6 +17,7 @@ D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\ma
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\rabbitmq\EventPublisher.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\controller\AuditController.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\service\MilestoneService.java
+D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\config\DevAuthStartupLogger.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\security\JwtAuthFilter.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\audit\AuditService.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\exception\InvalidSignatureException.java
@@ -59,6 +61,7 @@ D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\ma
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\dto\response\MilestoneResponse.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\service\ContractService.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\entity\Transaction.java
+D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\security\DevAuthFilter.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\events\ProjectMatchedEvent.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\service\TransactionService.java
 D:\Projects\DevCollab-Freelance-Platform-for-Tech-Students\escrow-service\src\main\java\com\devcollab\escrow\enums\MilestoneStatus.java

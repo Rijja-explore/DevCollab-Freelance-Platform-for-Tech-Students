@@ -29,13 +29,14 @@ public class AuditLog {
 
     @Id
     @UuidGenerator
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "id", updatable = false, nullable = false, columnDefinition = "CHAR(36)")
     private UUID id;
 
     @Column(name = "entity_type", nullable = false, length = 50)
     private String entityType;
 
-    @Column(name = "entity_id", nullable = false, columnDefinition = "CHAR(36)")
+    @Column(name = "entity_id", nullable = false, length = 255)
     private String entityId;
 
     @Enumerated(EnumType.STRING)

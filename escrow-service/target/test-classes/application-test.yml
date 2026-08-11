@@ -18,6 +18,11 @@ spring:
     port: 5672
     username: guest
     password: guest
+    listener:
+      simple:
+        auto-startup: false
+      direct:
+        auto-startup: false
 
 # Satisfies all @Value bindings in RabbitMQConfig
 escrow:
@@ -54,6 +59,12 @@ razorpay:
 
 rate-limiter:
   max-requests-per-minute: 1000
+
+management:
+  metrics:
+    binders:
+      rabbit:
+        enabled: false
 
 logging:
   level:

@@ -6,8 +6,10 @@ WORKDIR /app
 # Build-time args for Vite env injection
 ARG VITE_API_BASE_URL=""
 ARG VITE_PAYPAL_CLIENT_ID=""
+ARG VITE_DEV_AUTH="false"
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_PAYPAL_CLIENT_ID=$VITE_PAYPAL_CLIENT_ID
+ENV VITE_DEV_AUTH=$VITE_DEV_AUTH
 
 COPY package.json package-lock.json* ./
 RUN npm ci

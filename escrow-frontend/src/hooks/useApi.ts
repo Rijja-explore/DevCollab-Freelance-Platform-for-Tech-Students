@@ -45,7 +45,7 @@ export function useApi<T, Args extends any[]>(
         setLoading(false);
       }
     },
-    [apiFunc, options]
+    [apiFunc, options.onError, options.onSuccess, options.successMessage]
   );
 
   return { data, loading, error, execute, setData };

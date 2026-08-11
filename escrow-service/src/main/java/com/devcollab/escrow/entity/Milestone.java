@@ -28,6 +28,7 @@ public class Milestone {
 
     @Id
     @UuidGenerator
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "id", updatable = false, nullable = false, columnDefinition = "CHAR(36)")
     private UUID id;
 
@@ -56,6 +57,7 @@ public class Milestone {
     @Column(name = "due_date")
     private LocalDate dueDate;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "approved_by", columnDefinition = "CHAR(36)")
     private UUID approvedBy;
 

@@ -6,6 +6,8 @@ server:
 spring:
   application:
     name: escrow-service
+  profiles:
+    default: docker
 
   # ─────────────────────────────────────────────────────────
   #  Datasource

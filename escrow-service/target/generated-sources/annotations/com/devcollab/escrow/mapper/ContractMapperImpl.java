@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-08-11T23:47:18+0530",
-    comments = "version: 1.5.5.Final, compiler: Eclipse JDT (IDE) 3.46.100.v20260624-0231, environment: Java 21.0.11 (Eclipse Adoptium)"
+    date = "2026-08-12T03:26:15+0530",
+    comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.12 (Oracle Corporation)"
 )
 @Component
 public class ContractMapperImpl implements ContractMapper {
@@ -28,17 +28,17 @@ public class ContractMapperImpl implements ContractMapper {
         ContractResponse.ContractResponseBuilder contractResponse = ContractResponse.builder();
 
         contractResponse.milestones( milestoneMapper.toResponseList( contract.getMilestones() ) );
-        contractResponse.createdAt( contract.getCreatedAt() );
-        contractResponse.currency( contract.getCurrency() );
-        contractResponse.description( contract.getDescription() );
         contractResponse.id( contract.getId() );
         contractResponse.projectId( contract.getProjectId() );
         contractResponse.startupId( contract.getStartupId() );
-        contractResponse.status( contract.getStatus() );
         contractResponse.studentId( contract.getStudentId() );
-        contractResponse.terms( contract.getTerms() );
         contractResponse.title( contract.getTitle() );
+        contractResponse.description( contract.getDescription() );
         contractResponse.totalAmount( contract.getTotalAmount() );
+        contractResponse.currency( contract.getCurrency() );
+        contractResponse.status( contract.getStatus() );
+        contractResponse.terms( contract.getTerms() );
+        contractResponse.createdAt( contract.getCreatedAt() );
         contractResponse.updatedAt( contract.getUpdatedAt() );
 
         return contractResponse.build();
@@ -52,17 +52,17 @@ public class ContractMapperImpl implements ContractMapper {
 
         ContractResponse.ContractResponseBuilder contractResponse = ContractResponse.builder();
 
-        contractResponse.createdAt( contract.getCreatedAt() );
-        contractResponse.currency( contract.getCurrency() );
-        contractResponse.description( contract.getDescription() );
         contractResponse.id( contract.getId() );
         contractResponse.projectId( contract.getProjectId() );
         contractResponse.startupId( contract.getStartupId() );
-        contractResponse.status( contract.getStatus() );
         contractResponse.studentId( contract.getStudentId() );
-        contractResponse.terms( contract.getTerms() );
         contractResponse.title( contract.getTitle() );
+        contractResponse.description( contract.getDescription() );
         contractResponse.totalAmount( contract.getTotalAmount() );
+        contractResponse.currency( contract.getCurrency() );
+        contractResponse.status( contract.getStatus() );
+        contractResponse.terms( contract.getTerms() );
+        contractResponse.createdAt( contract.getCreatedAt() );
         contractResponse.updatedAt( contract.getUpdatedAt() );
 
         return contractResponse.build();

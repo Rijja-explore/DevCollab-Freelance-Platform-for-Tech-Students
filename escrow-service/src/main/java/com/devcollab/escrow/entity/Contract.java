@@ -30,15 +30,19 @@ public class Contract {
 
     @Id
     @UuidGenerator
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "id", updatable = false, nullable = false, columnDefinition = "CHAR(36)")
     private UUID id;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "project_id", nullable = false, columnDefinition = "CHAR(36)")
     private UUID projectId;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "startup_id", nullable = false, columnDefinition = "CHAR(36)")
     private UUID startupId;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "student_id", nullable = false, columnDefinition = "CHAR(36)")
     private UUID studentId;
 

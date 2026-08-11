@@ -69,7 +69,7 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
       DB_HOST: mysql-c
       DB_PORT: 3306
       DB_NAME: escrow_db
@@ -114,6 +114,7 @@ services:
         # /api/* paths, which nginx proxies to the escrow-service backend.
         VITE_API_BASE_URL: ""
         VITE_PAYPAL_CLIENT_ID: ${VITE_PAYPAL_CLIENT_ID:-}
+        VITE_DEV_AUTH: ${VITE_DEV_AUTH:-false}
     container_name: devcollab-escrow-frontend
     restart: unless-stopped
     depends_on:

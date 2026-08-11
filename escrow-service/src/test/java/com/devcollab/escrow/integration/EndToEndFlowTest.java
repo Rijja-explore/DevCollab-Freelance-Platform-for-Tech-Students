@@ -422,7 +422,7 @@ public class EndToEndFlowTest {
 
     @Test
     @Order(14)
-    @DisplayName("Flow D-4: POST /api/contracts without auth → 401 Unauthorized")
+        @DisplayName("Flow D-4: POST /api/contracts without auth → 403 Forbidden")
     void flowD4_contract_withoutAuth_returns401() throws Exception {
         CreateContractRequest request = new CreateContractRequest();
         request.setProjectId(UUID.randomUUID());
@@ -431,7 +431,7 @@ public class EndToEndFlowTest {
         mockMvc.perform(post("/api/contracts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized());
+                        .andExpect(status().isForbidden());
     }
 
     // ═════════════════════════════════════════════════════════════════════

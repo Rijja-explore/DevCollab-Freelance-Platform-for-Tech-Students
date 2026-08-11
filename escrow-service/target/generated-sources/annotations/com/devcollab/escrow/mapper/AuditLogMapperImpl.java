@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-08-11T23:47:19+0530",
-    comments = "version: 1.5.5.Final, compiler: Eclipse JDT (IDE) 3.46.100.v20260624-0231, environment: Java 21.0.11 (Eclipse Adoptium)"
+    date = "2026-08-12T03:26:15+0530",
+    comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.12 (Oracle Corporation)"
 )
 @Component
 public class AuditLogMapperImpl implements AuditLogMapper {
@@ -23,14 +23,14 @@ public class AuditLogMapperImpl implements AuditLogMapper {
 
         AuditLogResponse.AuditLogResponseBuilder auditLogResponse = AuditLogResponse.builder();
 
+        auditLogResponse.id( auditLog.getId() );
+        auditLogResponse.entityType( auditLog.getEntityType() );
+        auditLogResponse.entityId( auditLog.getEntityId() );
         auditLogResponse.action( auditLog.getAction() );
         auditLogResponse.actor( auditLog.getActor() );
-        auditLogResponse.createdAt( auditLog.getCreatedAt() );
         auditLogResponse.description( auditLog.getDescription() );
-        auditLogResponse.entityId( auditLog.getEntityId() );
-        auditLogResponse.entityType( auditLog.getEntityType() );
-        auditLogResponse.id( auditLog.getId() );
         auditLogResponse.metadata( auditLog.getMetadata() );
+        auditLogResponse.createdAt( auditLog.getCreatedAt() );
 
         return auditLogResponse.build();
     }

@@ -117,6 +117,19 @@ docker compose ps
 
 # 4. Stop everything (the -v flag also wipes the MySQL/RabbitMQ volumes)
 docker compose down -v
+
+### Development-only auth mode
+
+To test Person C without Person A, start the stack with the `dev` Spring profile so the backend injects a local test identity instead of requiring RS256 JWTs.
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = 'dev'
+docker compose up --build -d
+```
+
+In dev mode the service authenticates requests as `test-startup-001@dev.local` with `STARTUP` and `ADMIN` roles, while still using the same controllers, services, MySQL database, and PayPal sandbox flow.
+
+Production remains protected because the default profile stays on the normal JWT/RS256 security chain and `JwtAuthFilter` is not removed.
 ```
 
 For **Windows PowerShell**, use `$env:` instead of `export`:

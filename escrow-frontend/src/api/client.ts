@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+const DEV_AUTH_ENABLED = import.meta.env.VITE_DEV_AUTH === 'true'
 
 const client = axios.create({
   baseURL: BASE_URL,
@@ -13,6 +14,10 @@ const client = axios.create({
 // ─── Request Interceptor: Inject JWT ────────────────────────────────────────
 client.interceptors.request.use(
   (config) => {
+    if (DEV_AUTH_ENABLED) {
+      return config
+    }
+
     const token = localStorage.getItem('devcollab_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -33,6 +38,10 @@ client.interceptors.response.use(
     return Promise.reject(error)
   },
 )
+
+if (DEV_AUTH_ENABLED) {
+  localStorage.removeItem('devcollab_token')
+}
 
 // ─── API Functions ────────────────────────────────────────────────────────────
 

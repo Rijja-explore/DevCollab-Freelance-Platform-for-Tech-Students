@@ -1,6 +1,7 @@
 com\devcollab\escrow\payment\PaymentRequest$PaymentRequestBuilder.class
 com\devcollab\escrow\mapper\ContractMapperImpl.class
 com\devcollab\escrow\events\MilestoneCompletedEvent$MilestoneCompletedEventBuilder.class
+com\devcollab\escrow\config\DevSecurityConfig.class
 com\devcollab\escrow\entity\AuditLog$AuditLogBuilder.class
 com\devcollab\escrow\events\PaymentReleasedEvent$PaymentReleasedEventBuilderImpl.class
 com\devcollab\escrow\dto\response\MilestoneResponse$MilestoneResponseBuilder.class
@@ -54,11 +55,13 @@ com\devcollab\escrow\entity\ProcessedEvent.class
 com\devcollab\escrow\enums\TransactionStatus.class
 com\devcollab\escrow\events\PaymentFailedEvent$Payload.class
 com\devcollab\escrow\events\PaymentFailedEvent.class
+com\devcollab\escrow\security\DevAuthFilter.class
 com\devcollab\escrow\enums\ContractStatus.class
 com\devcollab\escrow\dto\response\ApiResponse.class
 com\devcollab\escrow\audit\AuditService.class
 com\devcollab\escrow\events\MilestoneCompletedEvent.class
 com\devcollab\escrow\exception\GlobalExceptionHandler.class
+com\devcollab\escrow\config\DevAuthStartupLogger.class
 com\devcollab\escrow\entity\Milestone$MilestoneBuilder.class
 com\devcollab\escrow\security\JwtService.class
 com\devcollab\escrow\entity\Milestone.class
