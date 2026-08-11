@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -163,11 +164,32 @@ public class MilestoneService {
      */
     @Transactional
     public MilestoneResponse releaseMilestone(UUID milestoneId, String actor) {
+        return releaseMilestone(milestoneId, "release:" + milestoneId.toString(), actor);
+    }
+
+    /**
+     * Release payment for an approved milestone via the configured provider.
+     * Supports API-level idempotency via idempotencyKey.
+     */
+    @Transactional
+    public MilestoneResponse releaseMilestone(UUID milestoneId, String idempotencyKey, String actor) {
         Milestone milestone = findMilestoneOrThrow(milestoneId);
+
+        // Check idempotency key in transaction repository — if present, return existing milestone state safely
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Optional<Transaction> existingTx = transactionRepository.findByIdempotencyKey(idempotencyKey);
+            if (existingTx.isPresent()) {
+                log.info("Duplicate milestone release attempt with key {} for milestone {} — returning existing state",
+                        idempotencyKey, milestoneId);
+                return milestoneMapper.toResponse(milestone);
+            }
+        } else {
+            idempotencyKey = "release:" + milestoneId.toString();
+        }
 
         // Hard guard: cannot release twice
         if (milestone.getStatus() == MilestoneStatus.RELEASED) {
-            throw new DuplicateReleaseException(milestoneId.toString());
+            return milestoneMapper.toResponse(milestone);
         }
 
         if (milestone.getStatus() == MilestoneStatus.PAYMENT_PROCESSING) {
@@ -185,8 +207,6 @@ public class MilestoneService {
         if (transactionRepository.existsByMilestoneIdAndStatus(milestoneId, TransactionStatus.SUCCESS)) {
             throw new DuplicateReleaseException(milestoneId.toString());
         }
-
-        String idempotencyKey = "release:" + milestoneId.toString();
 
         // Create provider order
         PaymentRequest paymentRequest = PaymentRequest.builder()
@@ -237,8 +257,9 @@ public class MilestoneService {
                     .transactionId(transaction.getId())
                     .milestoneId(milestoneId)
                     .contractId(milestone.getContract().getId())
+                    .projectId(milestone.getContract().getProjectId())
                     .amount(milestone.getAmount())
-                    .failureReason(result.getFailureReason())
+                    .reason(result.getFailureReason())
                     .build());
         }
 

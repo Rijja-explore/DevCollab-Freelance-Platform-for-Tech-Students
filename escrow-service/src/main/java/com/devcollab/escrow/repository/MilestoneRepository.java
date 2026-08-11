@@ -16,7 +16,8 @@ import java.util.UUID;
 @Repository
 public interface MilestoneRepository extends JpaRepository<Milestone, UUID> {
 
-    List<Milestone> findByContractIdOrderBySequenceOrder(UUID contractId);
+    @Query("SELECT m FROM Milestone m WHERE m.contract.id = :contractId ORDER BY m.sequenceOrder")
+    List<Milestone> findByContractIdOrderBySequenceOrder(@Param("contractId") UUID contractId);
 
     Page<Milestone> findByContractId(UUID contractId, Pageable pageable);
 

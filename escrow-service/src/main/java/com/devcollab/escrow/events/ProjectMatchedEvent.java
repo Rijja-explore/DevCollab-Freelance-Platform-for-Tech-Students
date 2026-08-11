@@ -1,5 +1,6 @@
 package com.devcollab.escrow.events;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -28,21 +29,27 @@ public class ProjectMatchedEvent extends BaseEvent {
     public static class Payload {
 
         @JsonProperty("project_id")
+        @JsonAlias("projectId")
         private UUID projectId;
 
         @JsonProperty("startup_id")
+        @JsonAlias("startupId")
         private UUID startupId;
 
         @JsonProperty("student_id")
+        @JsonAlias("studentId")
         private UUID studentId;
 
         @JsonProperty("project_title")
+        @JsonAlias("projectTitle")
         private String projectTitle;
 
         @JsonProperty("project_description")
+        @JsonAlias("projectDescription")
         private String projectDescription;
 
         @JsonProperty("total_budget")
+        @JsonAlias({"totalBudget", "amount"})
         private BigDecimal totalBudget;
 
         @JsonProperty("currency")
@@ -67,9 +74,11 @@ public class ProjectMatchedEvent extends BaseEvent {
         private BigDecimal amount;
 
         @JsonProperty("sequence_order")
+        @JsonAlias("sequenceOrder")
         private int sequenceOrder;
 
         @JsonProperty("due_date")
+        @JsonAlias("dueDate")
         private String dueDate;
     }
 }

@@ -33,6 +33,11 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
     @Query("SELECT c FROM Contract c WHERE c.projectId = :projectId ORDER BY c.createdAt DESC")
     List<Contract> findAllByProjectId(@Param("projectId") UUID projectId);
 
+    Optional<Contract> findByProjectIdAndStatus(UUID projectId, ContractStatus status);
+
+    @Query("SELECT COUNT(c) FROM Contract c WHERE c.projectId = :projectId")
+    long countByProjectId(@Param("projectId") UUID projectId);
+
     @Query("SELECT COUNT(c) FROM Contract c WHERE c.status = :status")
     long countByStatus(@Param("status") ContractStatus status);
 

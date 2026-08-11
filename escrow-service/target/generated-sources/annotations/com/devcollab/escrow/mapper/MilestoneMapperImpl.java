@@ -11,8 +11,8 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-08-08T10:55:03+0530",
-    comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.12 (Oracle Corporation)"
+    date = "2026-08-11T23:47:19+0530",
+    comments = "version: 1.5.5.Final, compiler: Eclipse JDT (IDE) 3.46.100.v20260624-0231, environment: Java 21.0.11 (Eclipse Adoptium)"
 )
 @Component
 public class MilestoneMapperImpl implements MilestoneMapper {
@@ -26,18 +26,18 @@ public class MilestoneMapperImpl implements MilestoneMapper {
         MilestoneResponse.MilestoneResponseBuilder milestoneResponse = MilestoneResponse.builder();
 
         milestoneResponse.contractId( milestoneContractId( milestone ) );
-        milestoneResponse.id( milestone.getId() );
-        milestoneResponse.title( milestone.getTitle() );
-        milestoneResponse.description( milestone.getDescription() );
         milestoneResponse.amount( milestone.getAmount() );
+        milestoneResponse.approvedAt( milestone.getApprovedAt() );
+        milestoneResponse.approvedBy( milestone.getApprovedBy() );
+        milestoneResponse.createdAt( milestone.getCreatedAt() );
+        milestoneResponse.description( milestone.getDescription() );
+        milestoneResponse.dueDate( milestone.getDueDate() );
+        milestoneResponse.id( milestone.getId() );
+        milestoneResponse.idempotencyKey( milestone.getIdempotencyKey() );
+        milestoneResponse.releasedAt( milestone.getReleasedAt() );
         milestoneResponse.sequenceOrder( milestone.getSequenceOrder() );
         milestoneResponse.status( milestone.getStatus() );
-        milestoneResponse.dueDate( milestone.getDueDate() );
-        milestoneResponse.approvedBy( milestone.getApprovedBy() );
-        milestoneResponse.approvedAt( milestone.getApprovedAt() );
-        milestoneResponse.releasedAt( milestone.getReleasedAt() );
-        milestoneResponse.idempotencyKey( milestone.getIdempotencyKey() );
-        milestoneResponse.createdAt( milestone.getCreatedAt() );
+        milestoneResponse.title( milestone.getTitle() );
         milestoneResponse.updatedAt( milestone.getUpdatedAt() );
 
         return milestoneResponse.build();

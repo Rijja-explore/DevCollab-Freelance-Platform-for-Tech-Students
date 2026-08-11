@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.devcollab.escrow.integration.ContractIntegrationTest
+-------------------------------------------------------------------------------
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 9.096 s -- in com.devcollab.escrow.integration.ContractIntegrationTest

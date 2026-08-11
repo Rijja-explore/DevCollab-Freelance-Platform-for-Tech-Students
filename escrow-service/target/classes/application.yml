@@ -94,10 +94,20 @@ jwt:
 #  Payment Provider
 # ─────────────────────────────────────────────────────────
 # payment.provider selects the implementation:
-#   paypal → real PayPal Checkout REST API (requires credentials)
-#   mock   → offline/demo provider (default, no credentials needed)
+#   razorpay → Razorpay TEST MODE API
+#   paypal   → PayPal Checkout REST API
+#   mock     → offline/demo provider (default)
 payment:
   provider: ${PAYMENT_PROVIDER:mock}
+
+# ─────────────────────────────────────────────────────────
+#  Razorpay
+# ─────────────────────────────────────────────────────────
+razorpay:
+  key-id: ${PAYMENT_PROVIDER_KEY:rzp_test_placeholder}
+  key-secret: ${PAYMENT_PROVIDER_SECRET:rzp_secret_placeholder}
+  webhook-secret: ${WEBHOOK_SECRET:whsec_placeholder}
+  currency: ${RAZORPAY_CURRENCY:INR}
 
 # ─────────────────────────────────────────────────────────
 #  PayPal

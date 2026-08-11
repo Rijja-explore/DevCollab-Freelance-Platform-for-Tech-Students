@@ -1,0 +1,62 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL;NON_KEYWORDS=VALUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+# Satisfies all @Value bindings in RabbitMQConfig
+escrow:
+  exchange: devcollab.exchange
+  queues:
+    project-matched: project.matched.queue
+    milestone-completed: milestone.completed.queue
+  routing-keys:
+    project-matched: project.matched
+    milestone-completed: milestone.completed
+    payment-released: payment.released
+    payment-failed: payment.failed
+  dlx:
+    exchange: devcollab.dlx.exchange
+    queue: devcollab.dlx.queue
+
+jwt:
+  public-key: classpath:keys/test-public.pem
+  issuer: devcollab-auth
+
+payment:
+  provider: mock
+
+paypal:
+  client-id: mock_client_id
+  client-secret: mock_client_secret
+  mode: sandbox
+  webhook-id: mock_webhook_id
+
+razorpay:
+  key-id: mock_key_id
+  key-secret: test_secret
+  webhook-secret: test_webhook_secret_key_123
+
+rate-limiter:
+  max-requests-per-minute: 1000
+
+logging:
+  level:
+    com.devcollab: WARN
+    org.springframework.amqp: ERROR
+    org.springframework.web: WARN

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/contracts")
+@RequestMapping({"/api/payments/contracts", "/api/contracts"})
 @RequiredArgsConstructor
 @Tag(name = "Contracts", description = "Escrow contract management")
 public class ContractController {

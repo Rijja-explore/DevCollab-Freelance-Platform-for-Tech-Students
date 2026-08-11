@@ -38,24 +38,118 @@ public class WebhookProcessor {
         try {
             JsonNode root = objectMapper.readTree(rawPayload);
             String eventType = root.path("event_type").asText();
-            JsonNode resource = root.path("resource");
+            if (eventType == null || eventType.isBlank()) {
+                eventType = root.path("event").asText();
+            }
 
             log.info("Processing payment webhook event: {}", eventType);
 
             auditService.log("WEBHOOK", eventType,
-                    AuditAction.WEBHOOK_RECEIVED, "paypal",
+                    AuditAction.WEBHOOK_RECEIVED, "provider",
                     "Webhook event received: " + eventType);
 
             switch (eventType) {
-                case "PAYMENT.CAPTURE.COMPLETED" -> handleCaptureCompleted(resource);
-                case "PAYMENT.CAPTURE.DENIED"   -> handleCaptureDenied(resource);
-                default -> log.info("Ignoring unhandled webhook event type: {}", eventType);
+                case "PAYMENT.CAPTURE.COMPLETED" -> handleCaptureCompleted(root.path("resource"));
+                case "PAYMENT.CAPTURE.DENIED" -> handleCaptureDenied(root.path("resource"));
+                case "payment.captured", "order.paid" -> handleRazorpayCaptured(root);
+                case "payment.failed" -> handleRazorpayFailed(root);
+                default -> {
+                    // Generic fallback for custom/mock test webhooks
+                    if (root.has("milestone_id") || root.has("milestoneId")) {
+                        handleGenericWebhook(root);
+                    } else {
+                        log.info("Ignoring unhandled webhook event type: {}", eventType);
+                    }
+                }
             }
 
         } catch (Exception e) {
             log.error("Error processing webhook payload: {}", e.getMessage(), e);
             throw new RuntimeException("Webhook processing failed: " + e.getMessage(), e);
         }
+    }
+
+    private void handleRazorpayCaptured(JsonNode root) {
+        JsonNode entity = root.path("payload").path("payment").path("entity");
+        String paymentId = entity.path("id").asText();
+        String orderId = entity.path("order_id").asText();
+        String milestoneIdStr = entity.path("notes").path("milestone_id").asText();
+
+        if (paymentId.isBlank()) {
+            paymentId = root.path("payment_id").asText(root.path("id").asText("pay_" + UUID.randomUUID()));
+        }
+        if (orderId.isBlank()) {
+            orderId = root.path("order_id").asText("order_mock");
+        }
+        if (milestoneIdStr.isBlank()) {
+            milestoneIdStr = root.path("milestone_id").asText(root.path("milestoneId").asText());
+        }
+
+        processPaymentConfirmation(paymentId, orderId, milestoneIdStr, "razorpay");
+    }
+
+    private void handleRazorpayFailed(JsonNode root) {
+        JsonNode entity = root.path("payload").path("payment").path("entity");
+        String paymentId = entity.path("id").asText(root.path("payment_id").asText());
+        String reason = entity.path("error_description").asText(root.path("reason").asText("Payment failed"));
+
+        if (processedEventRepository.existsByEventId("denied:" + paymentId)) {
+            return;
+        }
+
+        processedEventRepository.save(ProcessedEvent.builder()
+                .eventId("denied:" + paymentId)
+                .eventType("payment.failed")
+                .producer("razorpay")
+                .build());
+
+        auditService.log("TRANSACTION", paymentId,
+                AuditAction.PAYMENT_FAILED, "razorpay",
+                "Payment failed: " + reason);
+    }
+
+    private void handleGenericWebhook(JsonNode root) {
+        String milestoneIdStr = root.has("milestone_id") ? root.path("milestone_id").asText() : root.path("milestoneId").asText();
+        String paymentId = root.path("payment_id").asText(root.path("id").asText("pay_" + UUID.randomUUID()));
+        String orderId = root.path("order_id").asText("order_generic");
+
+        processPaymentConfirmation(paymentId, orderId, milestoneIdStr, "generic");
+    }
+
+    private void processPaymentConfirmation(String paymentId, String orderId, String milestoneIdStr, String producer) {
+        if (milestoneIdStr == null || milestoneIdStr.isBlank()) {
+            log.warn("Webhook event missing milestone_id. PaymentId: {}, OrderId: {}", paymentId, orderId);
+            return;
+        }
+
+        UUID milestoneId;
+        try {
+            milestoneId = UUID.fromString(milestoneIdStr);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid milestone_id format: {}", milestoneIdStr);
+            return;
+        }
+
+        // Idempotency check
+        if (processedEventRepository.existsByEventId(paymentId)) {
+            log.info("Payment {} already processed — skipping duplicate webhook", paymentId);
+            auditService.log("WEBHOOK", paymentId,
+                    AuditAction.DUPLICATE_EVENT_IGNORED, producer,
+                    "Duplicate webhook ignored for payment: " + paymentId);
+            return;
+        }
+
+        processedEventRepository.save(ProcessedEvent.builder()
+                .eventId(paymentId)
+                .eventType("payment.released")
+                .producer(producer)
+                .build());
+
+        milestoneService.confirmPaymentRelease(milestoneId, paymentId, orderId, producer + ":webhook");
+
+        auditService.log("TRANSACTION", paymentId,
+                AuditAction.PAYMENT_RELEASED, producer,
+                String.format("Payment confirmed: %s for order %s, milestone %s", paymentId, orderId, milestoneId));
     }
 
     private void handleCaptureCompleted(JsonNode resource) {

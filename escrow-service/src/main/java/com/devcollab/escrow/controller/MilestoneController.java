@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/milestones")
+@RequestMapping({"/api/payments/milestones", "/api/milestones"})
 @RequiredArgsConstructor
 @Tag(name = "Milestones", description = "Milestone lifecycle and payment release management")
 public class MilestoneController {
@@ -36,7 +36,7 @@ public class MilestoneController {
             @Valid @RequestBody CreateMilestoneRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
 
-        MilestoneResponse response = milestoneService.createMilestone(request, principal.getEmail());
+        MilestoneResponse response = milestoneService.createMilestone(request, principal != null ? principal.getEmail() : "system");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response, "Milestone created"));
     }
@@ -68,7 +68,7 @@ public class MilestoneController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         return ResponseEntity.ok(ApiResponse.success(
-                milestoneService.updateMilestone(id, request, principal.getEmail())));
+                milestoneService.updateMilestone(id, request, principal != null ? principal.getEmail() : "system")));
     }
 
     @PostMapping("/{id}/approve")
@@ -78,8 +78,9 @@ public class MilestoneController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UserPrincipal principal) {
 
-        MilestoneResponse response = milestoneService.approveMilestone(
-                id, principal.getUserId(), principal.getEmail());
+        UUID actorId = principal != null ? principal.getUserId() : UUID.randomUUID();
+        String actorEmail = principal != null ? principal.getEmail() : "system";
+        MilestoneResponse response = milestoneService.approveMilestone(id, actorId, actorEmail);
         return ResponseEntity.ok(ApiResponse.success(response, "Milestone approved. Payment order created."));
     }
 
@@ -88,9 +89,14 @@ public class MilestoneController {
     @Operation(summary = "Trigger payment release for an approved milestone")
     public ResponseEntity<ApiResponse<MilestoneResponse>> releaseMilestone(
             @PathVariable UUID id,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal UserPrincipal principal) {
 
-        MilestoneResponse response = milestoneService.releaseMilestone(id, principal.getEmail());
+        String key = (idempotencyKey != null && !idempotencyKey.isBlank())
+                ? idempotencyKey : "release:" + id.toString();
+        String actor = principal != null ? principal.getEmail() : "system";
+
+        MilestoneResponse response = milestoneService.releaseMilestone(id, key, actor);
         return ResponseEntity.ok(ApiResponse.success(response, "Payment release initiated"));
     }
 }

@@ -1,6 +1,7 @@
 package com.devcollab.escrow.config;
 
 import com.devcollab.escrow.security.JwtAuthFilter;
+import com.devcollab.escrow.security.RateLimiterFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +26,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final RateLimiterFilter rateLimiterFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -35,7 +37,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Webhook bypasses JWT — HMAC verified at controller level
-                        .requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/payments/webhook", "/api/payments/webhook/**").permitAll()
 
                         // Actuator health checks
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
@@ -49,6 +51,7 @@ public class SecurityConfig {
                         // All other endpoints require authentication
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(rateLimiterFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

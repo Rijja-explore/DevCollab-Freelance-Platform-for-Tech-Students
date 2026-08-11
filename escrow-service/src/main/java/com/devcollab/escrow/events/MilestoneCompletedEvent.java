@@ -1,5 +1,6 @@
 package com.devcollab.escrow.events;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -26,16 +27,24 @@ public class MilestoneCompletedEvent extends BaseEvent {
     @AllArgsConstructor
     public static class Payload {
 
+        @JsonProperty("project_id")
+        @JsonAlias("projectId")
+        private UUID projectId;
+
         @JsonProperty("milestone_id")
+        @JsonAlias("milestoneId")
         private UUID milestoneId;
 
         @JsonProperty("contract_id")
+        @JsonAlias("contractId")
         private UUID contractId;
 
         @JsonProperty("student_id")
+        @JsonAlias({"studentId", "submittedBy"})
         private UUID studentId;
 
         @JsonProperty("completion_notes")
+        @JsonAlias("completionNotes")
         private String completionNotes;
 
         @JsonProperty("amount")

@@ -34,7 +34,7 @@ public class Transaction {
     @JoinColumn(name = "milestone_id", nullable = false, foreignKey = @ForeignKey(name = "fk_transaction_milestone"))
     private Milestone milestone;
 
-    @Column(name = "provider_transaction_id", length = 100)
+    @Column(name = "provider_transaction_id", unique = true, length = 100)
     private String providerTransactionId;
 
     @Column(name = "provider_order_id", length = 100)

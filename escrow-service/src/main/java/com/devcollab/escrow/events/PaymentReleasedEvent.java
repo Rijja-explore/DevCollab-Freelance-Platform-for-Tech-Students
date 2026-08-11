@@ -1,5 +1,6 @@
 package com.devcollab.escrow.events;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,19 +29,28 @@ public class PaymentReleasedEvent extends BaseEvent {
     @Builder
     public static class Payload {
 
+        @JsonProperty("project_id")
+        @JsonAlias("projectId")
+        private UUID projectId;
+
         @JsonProperty("transaction_id")
+        @JsonAlias("transactionId")
         private UUID transactionId;
 
         @JsonProperty("milestone_id")
+        @JsonAlias("milestoneId")
         private UUID milestoneId;
 
         @JsonProperty("contract_id")
+        @JsonAlias("contractId")
         private UUID contractId;
 
         @JsonProperty("student_id")
+        @JsonAlias("studentId")
         private UUID studentId;
 
         @JsonProperty("startup_id")
+        @JsonAlias("startupId")
         private UUID startupId;
 
         @JsonProperty("amount")
@@ -50,6 +60,11 @@ public class PaymentReleasedEvent extends BaseEvent {
         private String currency;
 
         @JsonProperty("provider_payment_id")
+        @JsonAlias("providerPaymentId")
         private String providerPaymentId;
+
+        @JsonProperty("status")
+        @Builder.Default
+        private String status = "released";
     }
 }

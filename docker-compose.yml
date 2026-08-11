@@ -3,9 +3,12 @@ services:
   # ─────────────────────────────────────────────────────────────────────────────
   #  MySQL
   # ─────────────────────────────────────────────────────────────────────────────
-  mysql:
+  # ─────────────────────────────────────────────────────────────────────────────
+  #  MySQL
+  # ─────────────────────────────────────────────────────────────────────────────
+  mysql-c:
     image: mysql:8.0
-    container_name: devcollab-mysql
+    container_name: mysql-c
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: root_password
@@ -61,13 +64,13 @@ services:
     container_name: devcollab-escrow-service
     restart: unless-stopped
     depends_on:
-      mysql:
+      mysql-c:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      DB_HOST: mysql
+      DB_HOST: mysql-c
       DB_PORT: 3306
       DB_NAME: escrow_db
       DB_USERNAME: escrow_user
@@ -77,6 +80,9 @@ services:
       RABBITMQ_USERNAME: guest
       RABBITMQ_PASSWORD: guest
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+      PAYMENT_PROVIDER_KEY: ${PAYMENT_PROVIDER_KEY:-rzp_test_placeholder}
+      PAYMENT_PROVIDER_SECRET: ${PAYMENT_PROVIDER_SECRET:-rzp_secret_placeholder}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-whsec_placeholder}
       PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
       PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
       PAYPAL_MODE: ${PAYPAL_MODE:-sandbox}

@@ -11,8 +11,8 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-08-08T10:55:03+0530",
-    comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.12 (Oracle Corporation)"
+    date = "2026-08-11T23:47:19+0530",
+    comments = "version: 1.5.5.Final, compiler: Eclipse JDT (IDE) 3.46.100.v20260624-0231, environment: Java 21.0.11 (Eclipse Adoptium)"
 )
 @Component
 public class TransactionMapperImpl implements TransactionMapper {
@@ -26,17 +26,17 @@ public class TransactionMapperImpl implements TransactionMapper {
         TransactionResponse.TransactionResponseBuilder transactionResponse = TransactionResponse.builder();
 
         transactionResponse.milestoneId( transactionMilestoneId( transaction ) );
+        transactionResponse.amount( transaction.getAmount() );
+        transactionResponse.completedAt( transaction.getCompletedAt() );
+        transactionResponse.createdAt( transaction.getCreatedAt() );
+        transactionResponse.currency( transaction.getCurrency() );
+        transactionResponse.failureReason( transaction.getFailureReason() );
         transactionResponse.id( transaction.getId() );
-        transactionResponse.providerTransactionId( transaction.getProviderTransactionId() );
+        transactionResponse.provider( transaction.getProvider() );
         transactionResponse.providerOrderId( transaction.getProviderOrderId() );
         transactionResponse.providerPaymentId( transaction.getProviderPaymentId() );
-        transactionResponse.amount( transaction.getAmount() );
-        transactionResponse.currency( transaction.getCurrency() );
+        transactionResponse.providerTransactionId( transaction.getProviderTransactionId() );
         transactionResponse.status( transaction.getStatus() );
-        transactionResponse.provider( transaction.getProvider() );
-        transactionResponse.failureReason( transaction.getFailureReason() );
-        transactionResponse.createdAt( transaction.getCreatedAt() );
-        transactionResponse.completedAt( transaction.getCompletedAt() );
 
         return transactionResponse.build();
     }

@@ -50,13 +50,29 @@ public class ContractService {
                     HttpStatus.CONFLICT, "DUPLICATE_CONTRACT");
         }
 
+        UUID startupId = request.getStartupId() != null ? request.getStartupId() : UUID.randomUUID();
+        UUID studentId = request.getStudentId() != null ? request.getStudentId() : UUID.randomUUID();
+        String title = (request.getTitle() != null && !request.getTitle().isBlank())
+                ? request.getTitle() : "Escrow Contract for Project " + request.getProjectId();
+
+        java.math.BigDecimal totalAmount = request.getTotalAmount();
+        if (totalAmount == null) {
+            if (request.getMilestones() != null && !request.getMilestones().isEmpty()) {
+                totalAmount = request.getMilestones().stream()
+                        .map(m -> m.getAmount() != null ? m.getAmount() : java.math.BigDecimal.ZERO)
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+            } else {
+                totalAmount = java.math.BigDecimal.ZERO;
+            }
+        }
+
         Contract contract = Contract.builder()
                 .projectId(request.getProjectId())
-                .startupId(request.getStartupId())
-                .studentId(request.getStudentId())
-                .title(request.getTitle())
+                .startupId(startupId)
+                .studentId(studentId)
+                .title(title)
                 .description(request.getDescription())
-                .totalAmount(request.getTotalAmount())
+                .totalAmount(totalAmount)
                 .currency(request.getCurrency() != null ? request.getCurrency() : "INR")
                 .terms(request.getTerms())
                 .status(ContractStatus.ACTIVE)
@@ -68,17 +84,24 @@ public class ContractService {
         // Create milestones if provided
         if (request.getMilestones() != null && !request.getMilestones().isEmpty()) {
             final Contract savedContract = contract;
-            List<Milestone> milestones = request.getMilestones().stream()
-                    .map(md -> Milestone.builder()
-                            .contract(savedContract)
-                            .title(md.getTitle())
-                            .description(md.getDescription())
-                            .amount(md.getAmount())
-                            .sequenceOrder(md.getSequenceOrder())
-                            .dueDate(md.getDueDate())
-                            .status(MilestoneStatus.PENDING)
-                            .build())
-                    .toList();
+            List<Milestone> milestones = new ArrayList<>();
+            for (int i = 0; i < request.getMilestones().size(); i++) {
+                var md = request.getMilestones().get(i);
+                String milestoneTitle = (md.getTitle() != null && !md.getTitle().isBlank())
+                        ? md.getTitle() : "Milestone #" + (i + 1);
+                int seq = md.getSequenceOrder() != null ? md.getSequenceOrder() : (i + 1);
+                java.math.BigDecimal amt = md.getAmount() != null ? md.getAmount() : java.math.BigDecimal.ZERO;
+
+                milestones.add(Milestone.builder()
+                        .contract(savedContract)
+                        .title(milestoneTitle)
+                        .description(md.getDescription())
+                        .amount(amt)
+                        .sequenceOrder(seq)
+                        .dueDate(md.getDueDate())
+                        .status(MilestoneStatus.PENDING)
+                        .build());
+            }
             milestoneRepository.saveAll(milestones);
             contract.getMilestones().addAll(milestones);
         }
@@ -158,6 +181,13 @@ public class ContractService {
                                     List<MilestoneDefinitionData> milestoneDefs) {
         log.info("Creating contract from event for project: {}", projectId);
 
+        // Idempotency guard: skip if an ACTIVE contract already exists for this project
+        if (contractRepository.existsByProjectIdAndStatus(projectId, ContractStatus.ACTIVE)) {
+            log.warn("Active contract already exists for project {} — skipping duplicate event", projectId);
+            return contractRepository.findByProjectIdAndStatus(projectId, ContractStatus.ACTIVE)
+                    .orElseThrow();
+        }
+
         Contract contract = Contract.builder()
                 .projectId(projectId)
                 .startupId(startupId)
@@ -186,6 +216,18 @@ public class ContractService {
                             .build())
                     .toList();
             milestoneRepository.saveAll(milestones);
+            savedContract.getMilestones().addAll(milestones);
+        } else {
+            Milestone defaultMilestone = Milestone.builder()
+                    .contract(savedContract)
+                    .title("Initial Project Milestone")
+                    .description("Auto-generated milestone for matched project")
+                    .amount(totalBudget != null ? totalBudget : java.math.BigDecimal.ZERO)
+                    .sequenceOrder(1)
+                    .status(MilestoneStatus.PENDING)
+                    .build();
+            milestoneRepository.save(defaultMilestone);
+            savedContract.getMilestones().add(defaultMilestone);
         }
 
         auditService.log("CONTRACT", contract.getId().toString(),

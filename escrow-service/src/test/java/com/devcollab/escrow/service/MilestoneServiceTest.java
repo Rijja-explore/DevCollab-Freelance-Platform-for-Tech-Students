@@ -73,17 +73,24 @@ class MilestoneServiceTest {
     }
 
     @Test
-    @DisplayName("Should reject release when milestone is already RELEASED")
-    void releaseMilestone_ShouldThrow_WhenAlreadyReleased() {
+    @DisplayName("Should return existing milestone safely when milestone is already RELEASED")
+    void releaseMilestone_ShouldReturnExisting_WhenAlreadyReleased() {
         // Given
         milestone.setStatus(MilestoneStatus.RELEASED);
         given(milestoneRepository.findById(milestone.getId()))
                 .willReturn(Optional.of(milestone));
+        given(milestoneMapper.toResponse(milestone))
+                .willReturn(com.devcollab.escrow.dto.response.MilestoneResponse.builder()
+                        .id(milestone.getId())
+                        .status(MilestoneStatus.RELEASED)
+                        .build());
 
-        // When / Then
-        assertThatThrownBy(() -> milestoneService.releaseMilestone(milestone.getId(), "startup@test.com"))
-                .isInstanceOf(DuplicateReleaseException.class);
+        // When
+        var response = milestoneService.releaseMilestone(milestone.getId(), "startup@test.com");
 
+        // Then
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(MilestoneStatus.RELEASED);
         then(paymentService).should(never()).createOrder(any());
     }
 

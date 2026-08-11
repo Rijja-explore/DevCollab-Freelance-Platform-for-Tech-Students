@@ -12,6 +12,7 @@ com\devcollab\escrow\entity\AuditLog.class
 com\devcollab\escrow\dto\response\MilestoneResponse.class
 com\devcollab\escrow\dto\response\PageResponse.class
 com\devcollab\escrow\controller\MilestoneController.class
+com\devcollab\escrow\payment\RazorpayPaymentService.class
 com\devcollab\escrow\security\UserPrincipal.class
 com\devcollab\escrow\dto\response\ContractResponse$ContractResponseBuilder.class
 com\devcollab\escrow\dto\request\CreateContractRequest.class
@@ -95,6 +96,7 @@ com\devcollab\escrow\events\PaymentReleasedEvent$Payload$PayloadBuilder.class
 com\devcollab\escrow\events\BaseEvent.class
 com\devcollab\escrow\events\PaymentFailedEvent$Payload$PayloadBuilder.class
 com\devcollab\escrow\dto\request\CreateContractRequest$MilestoneDefinition.class
+com\devcollab\escrow\security\RateLimiterFilter.class
 com\devcollab\escrow\entity\Transaction.class
 com\devcollab\escrow\events\BaseEvent$BaseEventBuilder.class
 com\devcollab\escrow\exception\ResourceNotFoundException.class

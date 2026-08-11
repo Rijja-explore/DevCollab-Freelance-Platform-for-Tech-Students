@@ -19,21 +19,17 @@ public class CreateContractRequest {
     @NotNull(message = "projectId is required")
     private UUID projectId;
 
-    @NotNull(message = "startupId is required")
     private UUID startupId;
 
-    @NotNull(message = "studentId is required")
     private UUID studentId;
 
-    @NotBlank(message = "title is required")
-    @Size(min = 5, max = 255, message = "title must be between 5 and 255 characters")
+    @Size(max = 255, message = "title must not exceed 255 characters")
     private String title;
 
     @Size(max = 5000, message = "description must not exceed 5000 characters")
     private String description;
 
-    @NotNull(message = "totalAmount is required")
-    @DecimalMin(value = "1.00", message = "totalAmount must be at least 1.00")
+    @DecimalMin(value = "0.00", message = "totalAmount must be non-negative")
     @Digits(integer = 15, fraction = 4, message = "Invalid totalAmount format")
     private BigDecimal totalAmount;
 
@@ -51,22 +47,19 @@ public class CreateContractRequest {
     @NoArgsConstructor
     public static class MilestoneDefinition {
 
-        @NotBlank(message = "milestone title is required")
-        @Size(min = 3, max = 255)
+        @Size(max = 255)
         private String title;
 
         @Size(max = 2000)
         private String description;
 
-        @NotNull(message = "milestone amount is required")
-        @DecimalMin(value = "0.01")
+        @DecimalMin(value = "0.00")
         private BigDecimal amount;
 
-        @NotNull(message = "sequenceOrder is required")
         @Min(value = 1)
         private Integer sequenceOrder;
 
-        @Future(message = "dueDate must be in the future")
         private LocalDate dueDate;
     }
 }
+
