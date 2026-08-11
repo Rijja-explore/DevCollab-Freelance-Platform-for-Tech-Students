@@ -4,7 +4,7 @@ import { useApi } from '../hooks/useApi';
 import { TableSkeleton } from '../components/LoadingSkeleton';
 import { StatusBadge } from '../components/StatusBadge';
 import { format } from 'date-fns';
-import { Calendar, Search, DollarSign } from 'lucide-react';
+import { Calendar, Search } from 'lucide-react';
 
 export const Transactions: React.FC = () => {
   const [page, setPage] = useState(0);
@@ -65,9 +65,9 @@ export const Transactions: React.FC = () => {
             <table className="w-full min-w-[800px]">
               <thead>
                 <tr className="bg-white/5 border-b border-white/10">
-                  <th className="table-header">Transaction ID</th>
-                  <th className="table-header">Razorpay Order ID</th>
-                  <th className="table-header">Razorpay Payment ID</th>
+<th className="table-header">Transaction ID</th>
+                  <th className="table-header">Provider Order ID</th>
+                  <th className="table-header">Provider Payment ID</th>
                   <th className="table-header">Amount</th>
                   <th className="table-header">Status</th>
                   <th className="table-header">Created At</th>

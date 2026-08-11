@@ -123,7 +123,7 @@ export const Dashboard: React.FC = () => {
               <span className="gradient-text">DevCollab Vault</span>
             </h1>
             <p className="text-slate-400 text-sm mt-3 max-w-lg leading-relaxed">
-              Monitor escrow contracts, milestone releases, and Razorpay payments — all in one secure dashboard for startup–student collaborations.
+              Monitor escrow contracts, milestone releases, and payment gateway transactions — all in one secure dashboard for startup–student collaborations.
             </p>
           </div>
 
@@ -166,7 +166,7 @@ export const Dashboard: React.FC = () => {
         <StatCard
           title="Released Payments"
           value={stats.releasedPayments}
-          description="Via Razorpay"
+          description="Via payment gateway"
           icon={CheckCircle}
           loading={loading}
           accent="violet"
@@ -358,7 +358,7 @@ export const Dashboard: React.FC = () => {
 
           <div className="mt-5 pt-4 border-t border-surface-border flex items-center gap-2 text-[11px] text-slate-600">
             <Zap className="w-3.5 h-3.5 text-vault-amber" />
-            Razorpay signatures verified on capture
+            Provider signatures verified on capture
           </div>
         </div>
       </div>

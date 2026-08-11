@@ -32,7 +32,7 @@ public class SwaggerConfig {
                                 - `STARTUP` — Can create contracts, approve milestones, release payments
                                 - `ADMIN` — Full access including audit logs
                                 
-                                **Webhook:** POST /api/payments/webhook — Razorpay only (HMAC verified)
+                                **Webhook:** POST /api/payments/webhook — provider signature verified (PayPal transmission HMAC or mock)
                                 """)
                         .version("1.0.0")
                         .contact(new Contact()

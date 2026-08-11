@@ -15,14 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 /**
- * Processes incoming Razorpay webhook events.
+ * Processes incoming payment webhook events.
  *
- * Razorpay sends webhooks for:
- * - payment.captured  → release milestone, update transaction
- * - payment.failed    → mark milestone failed, update transaction
- * - order.paid        → (ignored, handled via payment.captured)
+ * Supports PayPal events:
+ * - PAYMENT.CAPTURE.COMPLETED → release milestone, update transaction
+ * - PAYMENT.CAPTURE.DENIED   → mark milestone failed, update transaction
  *
- * Idempotency: uses razorpay_payment_id as event_id in ProcessedEvent table.
+ * Idempotency: uses capture id as event_id in ProcessedEvent table.
  */
 @Component
 @RequiredArgsConstructor
@@ -38,18 +37,18 @@ public class WebhookProcessor {
     public void process(String rawPayload) {
         try {
             JsonNode root = objectMapper.readTree(rawPayload);
-            String eventType = root.path("event").asText();
-            JsonNode payload = root.path("payload");
+            String eventType = root.path("event_type").asText();
+            JsonNode resource = root.path("resource");
 
-            log.info("Processing Razorpay webhook event: {}", eventType);
+            log.info("Processing payment webhook event: {}", eventType);
 
             auditService.log("WEBHOOK", eventType,
-                    AuditAction.WEBHOOK_RECEIVED, "razorpay",
+                    AuditAction.WEBHOOK_RECEIVED, "paypal",
                     "Webhook event received: " + eventType);
 
             switch (eventType) {
-                case "payment.captured" -> handlePaymentCaptured(payload);
-                case "payment.failed"   -> handlePaymentFailed(payload);
+                case "PAYMENT.CAPTURE.COMPLETED" -> handleCaptureCompleted(resource);
+                case "PAYMENT.CAPTURE.DENIED"   -> handleCaptureDenied(resource);
                 default -> log.info("Ignoring unhandled webhook event type: {}", eventType);
             }
 
@@ -59,76 +58,78 @@ public class WebhookProcessor {
         }
     }
 
-    private void handlePaymentCaptured(JsonNode payload) {
-        JsonNode paymentEntity = payload.path("payment").path("entity");
+    private void handleCaptureCompleted(JsonNode resource) {
+        String captureId = resource.path("id").asText();
+        String orderId   = resource.path("supplementary_data").path("related_ids").path("order_id").asText();
+        String customId  = resource.path("custom_id").asText();
 
-        String paymentId = paymentEntity.path("id").asText();
-        String orderId   = paymentEntity.path("order_id").asText();
-        String notes     = paymentEntity.path("notes").toString();
+        // Fallback: order id may be embedded elsewhere
+        if (orderId == null || orderId.isBlank()) {
+            orderId = resource.path("links").path(0).path("href").asText();
+        }
 
         // Idempotency check
-        if (processedEventRepository.existsByEventId(paymentId)) {
-            log.info("Payment {} already processed — skipping duplicate webhook", paymentId);
-            auditService.log("WEBHOOK", paymentId,
-                    AuditAction.DUPLICATE_EVENT_IGNORED, "razorpay",
-                    "Duplicate payment.captured webhook ignored for payment: " + paymentId);
+        if (processedEventRepository.existsByEventId(captureId)) {
+            log.info("Payment {} already processed — skipping duplicate webhook", captureId);
+            auditService.log("WEBHOOK", captureId,
+                    AuditAction.DUPLICATE_EVENT_IGNORED, "paypal",
+                    "Duplicate capture webhook ignored for payment: " + captureId);
             return;
         }
 
-        // Extract milestone_id from Razorpay order notes
-        String milestoneIdStr = null;
-        try {
-            JsonNode notesNode = objectMapper.readTree(notes);
-            milestoneIdStr = notesNode.path("milestone_id").asText(null);
-        } catch (Exception e) {
-            log.warn("Could not parse order notes: {}", notes);
-        }
+        // Extract milestone_id from custom_id (set at order creation)
+        String milestoneIdStr = customId;
 
         if (milestoneIdStr == null || milestoneIdStr.isBlank()) {
-            log.warn("payment.captured webhook missing milestone_id in notes. OrderId: {}", orderId);
+            log.warn("PAYMENT.CAPTURE.COMPLETED webhook missing milestone_id in custom_id. OrderId: {}", orderId);
             return;
         }
 
-        UUID milestoneId = UUID.fromString(milestoneIdStr);
+        UUID milestoneId;
+        try {
+            milestoneId = UUID.fromString(milestoneIdStr);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid milestone_id in custom_id: {}", milestoneIdStr);
+            return;
+        }
 
         // Mark as processed (idempotency insert)
         processedEventRepository.save(ProcessedEvent.builder()
-                .eventId(paymentId)
-                .eventType("payment.captured")
-                .producer("razorpay")
+                .eventId(captureId)
+                .eventType("PAYMENT.CAPTURE.COMPLETED")
+                .producer("paypal")
                 .build());
 
         // Confirm payment release
-        milestoneService.confirmPaymentRelease(milestoneId, paymentId, orderId, "razorpay:webhook");
+        milestoneService.confirmPaymentRelease(milestoneId, captureId, orderId, "paypal:webhook");
 
-        auditService.log("TRANSACTION", paymentId,
-                AuditAction.PAYMENT_RELEASED, "razorpay",
+        auditService.log("TRANSACTION", captureId,
+                AuditAction.PAYMENT_RELEASED, "paypal",
                 String.format("Payment captured: %s for order %s, milestone %s",
-                        paymentId, orderId, milestoneId));
+                        captureId, orderId, milestoneId));
     }
 
-    private void handlePaymentFailed(JsonNode payload) {
-        JsonNode paymentEntity = payload.path("payment").path("entity");
-        String paymentId = paymentEntity.path("id").asText();
-        String orderId   = paymentEntity.path("order_id").asText();
-        String errorCode = paymentEntity.path("error_code").asText("UNKNOWN");
-        String errorDesc = paymentEntity.path("error_description").asText("Payment failed");
+    private void handleCaptureDenied(JsonNode resource) {
+        String captureId = resource.path("id").asText();
+        String orderId   = resource.path("supplementary_data").path("related_ids").path("order_id").asText();
+        String status    = resource.path("status").asText("DENIED");
+        String reason    = resource.path("status_details").path("reason").asText("Payment denied");
 
-        if (processedEventRepository.existsByEventId("failed:" + paymentId)) {
-            log.info("Payment failure {} already processed", paymentId);
+        if (processedEventRepository.existsByEventId("denied:" + captureId)) {
+            log.info("Payment denial {} already processed", captureId);
             return;
         }
 
         processedEventRepository.save(ProcessedEvent.builder()
-                .eventId("failed:" + paymentId)
-                .eventType("payment.failed")
-                .producer("razorpay")
+                .eventId("denied:" + captureId)
+                .eventType("PAYMENT.CAPTURE.DENIED")
+                .producer("paypal")
                 .build());
 
-        log.warn("Payment failed for order {}: [{}] {}", orderId, errorCode, errorDesc);
+        log.warn("Payment denied for order {}: [{}] {}", orderId, status, reason);
 
-        auditService.log("TRANSACTION", paymentId,
-                AuditAction.PAYMENT_FAILED, "razorpay",
-                String.format("Payment failed: [%s] %s. OrderId: %s", errorCode, errorDesc, orderId));
+        auditService.log("TRANSACTION", captureId,
+                AuditAction.PAYMENT_FAILED, "paypal",
+                String.format("Payment denied: [%s] %s. OrderId: %s", status, reason, orderId));
     }
 }

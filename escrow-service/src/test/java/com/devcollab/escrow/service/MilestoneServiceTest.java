@@ -131,7 +131,7 @@ class MilestoneServiceTest {
     }
 
     @Test
-    @DisplayName("Should create Razorpay order and transition to PAYMENT_PROCESSING on success")
+    @DisplayName("Should create payment order and transition to PAYMENT_PROCESSING on success")
     void releaseMilestone_ShouldCreateOrder_WhenApproved() {
         // Given
         given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
@@ -164,12 +164,12 @@ class MilestoneServiceTest {
     }
 
     @Test
-    @DisplayName("Should mark milestone FAILED when Razorpay order creation fails")
-    void releaseMilestone_ShouldMarkFailed_WhenRazorpayFails() {
+    @DisplayName("Should mark milestone FAILED when payment order creation fails")
+    void releaseMilestone_ShouldMarkFailed_WhenProviderFails() {
         // Given
         given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
         given(transactionRepository.existsByMilestoneIdAndStatus(any(), any())).willReturn(false);
-        given(paymentService.createOrder(any())).willReturn(PaymentResult.failure("Razorpay connection error"));
+        given(paymentService.createOrder(any())).willReturn(PaymentResult.failure("Payment provider connection error"));
         given(transactionRepository.save(any(Transaction.class))).willAnswer(inv -> inv.getArgument(0));
         given(milestoneRepository.save(any(Milestone.class))).willAnswer(inv -> inv.getArgument(0));
         given(milestoneMapper.toResponse(any(Milestone.class))).willReturn(

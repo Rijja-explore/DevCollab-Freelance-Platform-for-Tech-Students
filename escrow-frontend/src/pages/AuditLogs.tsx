@@ -3,7 +3,7 @@ import { auditApi } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { TableSkeleton } from '../components/LoadingSkeleton';
 import { format } from 'date-fns';
-import { Calendar, ShieldAlert, ArrowRight, User } from 'lucide-react';
+import { Calendar, ShieldAlert, User } from 'lucide-react';
 
 export const AuditLogs: React.FC = () => {
   const [page, setPage] = useState(0);

@@ -135,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             <span className="w-1 h-1 rounded-full bg-vault-teal animate-pulse" />
             Live
           </span>
-          <span className="text-[10px] text-slate-600">Razorpay connected</span>
+          <span className="text-[10px] text-slate-600">PayPal connected</span>
         </div>
       </div>
     </aside>

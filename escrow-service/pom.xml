@@ -24,7 +24,6 @@
         <jjwt.version>0.12.5</jjwt.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <lombok.version>1.18.30</lombok.version>
-        <razorpay.version>1.4.3</razorpay.version>
         <springdoc.version>2.3.0</springdoc.version>
         <testcontainers.version>1.19.7</testcontainers.version>
     </properties>
@@ -116,12 +115,11 @@
         </dependency>
 
         <!-- ============================================================ -->
-        <!--  Razorpay SDK                                                -->
+        <!--  WebClient (PayPal REST API)                                -->
         <!-- ============================================================ -->
         <dependency>
-            <groupId>com.razorpay</groupId>
-            <artifactId>razorpay-java</artifactId>
-            <version>${razorpay.version}</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
 
         <!-- ============================================================ -->

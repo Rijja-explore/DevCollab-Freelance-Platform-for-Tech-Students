@@ -4,8 +4,10 @@ import com.devcollab.escrow.enums.MilestoneStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -45,7 +47,8 @@ public class Milestone {
     @Column(name = "sequence_order", nullable = false)
     private Integer sequenceOrder;
 
-    @Enumerated(EnumType.STRING)
+@Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 30)
     @Builder.Default
     private MilestoneStatus status = MilestoneStatus.PENDING;

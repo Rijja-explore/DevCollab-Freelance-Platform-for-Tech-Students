@@ -2,6 +2,7 @@ package com.devcollab.escrow.events;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -23,6 +24,7 @@ public class PaymentFailedEvent extends BaseEvent {
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
+    @Builder
     public static class Payload {
 
         @JsonProperty("transaction_id")

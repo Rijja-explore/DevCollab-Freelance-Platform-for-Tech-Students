@@ -152,12 +152,12 @@ public class MilestoneService {
     }
 
     /**
-     * Release payment for an approved milestone via Razorpay.
+     * Release payment for an approved milestone via the configured provider.
      *
      * This method:
      * 1. Validates milestone is APPROVED (not already released)
      * 2. Checks no pending/successful transaction exists (idempotency)
-     * 3. Creates Razorpay order
+     * 3. Creates provider order
      * 4. Creates Transaction record
      * 5. Updates milestone to PAYMENT_PROCESSING
      */
@@ -188,7 +188,7 @@ public class MilestoneService {
 
         String idempotencyKey = "release:" + milestoneId.toString();
 
-        // Create Razorpay order
+        // Create provider order
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .milestoneId(milestoneId)
                 .amount(milestone.getAmount())
@@ -200,6 +200,9 @@ public class MilestoneService {
 
         PaymentResult result = paymentService.createOrder(paymentRequest);
 
+        // Determine provider name dynamically
+        String providerName = paymentService.getProviderName();
+
         // Record the transaction
         Transaction transaction = Transaction.builder()
                 .milestone(milestone)
@@ -207,7 +210,7 @@ public class MilestoneService {
                 .amount(milestone.getAmount())
                 .currency(milestone.getContract().getCurrency())
                 .status(result.isSuccess() ? TransactionStatus.PENDING : TransactionStatus.FAILED)
-                .provider("RAZORPAY")
+                .provider(providerName)
                 .failureReason(result.isSuccess() ? null : result.getFailureReason())
                 .idempotencyKey(idempotencyKey)
                 .build();
@@ -243,7 +246,7 @@ public class MilestoneService {
     }
 
     /**
-     * Called by WebhookProcessor after successful payment confirmation from Razorpay.
+     * Called by WebhookProcessor after successful payment confirmation from the provider.
      * Marks milestone as RELEASED and publishes payment.released event.
      */
     @Transactional

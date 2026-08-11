@@ -4,6 +4,7 @@ import com.devcollab.escrow.dto.request.CreateContractRequest;
 import com.devcollab.escrow.dto.response.ApiResponse;
 import com.devcollab.escrow.dto.response.ContractResponse;
 import com.devcollab.escrow.enums.ContractStatus;
+import com.devcollab.escrow.security.UserPrincipal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
@@ -18,8 +20,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -34,11 +38,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.flyway.enabled=false",
         "spring.rabbitmq.host=localhost",
         "spring.rabbitmq.port=5672",
-        "jwt.public-key=classpath:keys/test-public.pem",
+"jwt.public-key=classpath:keys/test-public.pem",
         "jwt.issuer=devcollab-auth",
-        "razorpay.key-id=rzp_test_mock",
-        "razorpay.key-secret=mock_secret",
-        "razorpay.webhook-secret=mock_webhook_secret"
+        "payment.provider=mock",
+        "paypal.client-id=mock_client_id",
+        "paypal.client-secret=mock_client_secret",
+        "paypal.mode=sandbox"
 })
 @DisplayName("Contract Integration Tests")
 class ContractIntegrationTest {
@@ -51,11 +56,16 @@ class ContractIntegrationTest {
 
     @Test
     @DisplayName("POST /api/contracts — should return 201 with STARTUP role")
-    @WithMockUser(username = "startup@test.com", roles = {"STARTUP"})
     void createContract_ShouldReturn201_WithStartupRole() throws Exception {
         CreateContractRequest request = buildCreateRequest("Integration Test Contract");
 
+        UserPrincipal principal = new UserPrincipal(
+                UUID.randomUUID(), "startup@test.com", List.of("STARTUP"));
+        UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+
         MvcResult result = mockMvc.perform(post("/api/contracts")
+                        .with(authentication(auth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())

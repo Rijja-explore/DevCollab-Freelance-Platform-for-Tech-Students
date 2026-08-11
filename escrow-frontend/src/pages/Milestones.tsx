@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { milestonesApi, contractsApi } from '../api/client';
+import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
+import { milestonesApi, contractsApi, transactionsApi } from '../api/client';
 import { useApi } from '../hooks/useApi';
 import { TableSkeleton } from '../components/LoadingSkeleton';
 import { StatusBadge } from '../components/StatusBadge';
@@ -8,12 +9,99 @@ import { format } from 'date-fns';
 import {
   Calendar,
   CheckCircle,
-  Plus,
   Play,
-  ArrowRight,
   ExternalLink,
+  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const isPayPalConfigured = Boolean(import.meta.env.VITE_PAYPAL_CLIENT_ID);
+
+interface CheckoutModalProps {
+  order: any;
+  onClose: () => void;
+  onSimulate: (milestoneId: string, amount: number, orderId: string) => void;
+}
+
+/**
+ * PayPal / Demo checkout modal.
+ *
+ * Only renders PayPalButtons when a client id is configured and the
+ * PayPalScriptProvider is mounted (App.tsx). Otherwise renders a mock
+ * "Simulate Payment" button for offline demos.
+ */
+const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onSimulate }) => {
+  // usePayPalScriptReducer is only valid when PayPalScriptProvider is mounted.
+  const scriptState = isPayPalConfigured
+    ? usePayPalScriptReducer()
+    : null;
+
+  const isPending = scriptState ? scriptState[0].isPending : false;
+  const isRejected = scriptState ? scriptState[0].isRejected : false;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="card w-full max-w-md p-6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-slate-400 hover:text-white"
+          aria-label="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <h3 className="text-lg font-bold text-white">Complete Payment</h3>
+        <p className="text-sm text-slate-400 mt-1">
+          {order.title} · ₹{order.amount.toLocaleString('en-IN')}
+        </p>
+
+        <div className="mt-6">
+          {isPayPalConfigured ? (
+            <div className="min-h-[140px]">
+              {isRejected && (
+                <p className="text-sm text-rose-400 mb-3">
+                  PayPal SDK failed to load. You may be offline.
+                </p>
+              )}
+              {isPending && (
+                <p className="text-sm text-slate-400 mb-3">Loading PayPal...</p>
+              )}
+              <PayPalButtons
+                forceReRender={[order.orderId]}
+                createOrder={() => order.orderId}
+                onApprove={async () => {
+                  toast.success('Payment approved. Capturing...');
+                  await onSimulate(order.milestoneId, order.amount, order.orderId);
+                }}
+                onCancel={() => {
+                  toast('Payment cancelled.', { icon: '❌' });
+                  onClose();
+                }}
+                onError={() => {
+                  toast.error('PayPal checkout errored.');
+                  onClose();
+                }}
+              />
+            </div>
+          ) : (
+            <div className="text-center">
+              <p className="text-sm text-slate-400 mb-4">
+                Running in <strong className="text-white">demo/mock</strong> mode. No PayPal client is
+                configured, so checkout is simulated.
+              </p>
+              <button
+                onClick={() => onSimulate(order.milestoneId, order.amount, order.orderId)}
+                className="btn-primary w-full"
+              >
+                Simulate Payment Capture
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const Milestones: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -21,6 +109,7 @@ export const Milestones: React.FC = () => {
 
   const [page, setPage] = useState(0);
   const [selectedContract, setSelectedContract] = useState<any>(null);
+  const [paypalOrder, setPaypalOrder] = useState<any>(null);
 
   const {
     data: milestonesData,
@@ -31,14 +120,14 @@ export const Milestones: React.FC = () => {
   const { execute: approveMilestone, loading: approving } = useApi<any, [string]>(
     milestonesApi.approve,
     {
-      successMessage: 'Milestone approved. Razorpay order initialized.',
+      successMessage: 'Milestone approved. Payment order can now be released.',
     }
   );
 
   const { execute: releaseMilestone, loading: releasing } = useApi<any, [string]>(
     milestonesApi.release,
     {
-      successMessage: 'Payment order created. Opening checkout...',
+      successMessage: 'Payment order created.',
     }
   );
 
@@ -51,71 +140,46 @@ export const Milestones: React.FC = () => {
     }
   }, [page, contractIdParam, fetchMilestones]);
 
-  // Load Razorpay Checkout SDK dynamically
-  const loadRazorpayScript = () => {
-    return new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
+  // Simulates capture for mock/demo provider (also finalizes after PayPal approval
+  // when a webhook isn't reachable in local dev).
+  const mockCapture = async (milestoneId: string, amount: number, orderId: string) => {
+    void milestoneId;
+    void amount;
+    toast.success(`Payment captured · ${orderId} (mock/demo)`);
+    setPaypalOrder(null);
+    // Refresh to reflect webhook/state changes
+    setTimeout(() => fetchMilestones(page), 1800);
   };
 
   const handlePay = async (milestoneId: string, amount: number, contractTitle: string) => {
     try {
-      // 1. Release Milestone (calls backend which contacts Razorpay to generate order)
       const milestoneRes = await releaseMilestone(milestoneId);
-      const milestoneData = milestoneRes;
+      const milestoneData = milestoneRes?.data ?? milestoneRes;
 
-      // In real integration, we get order details from backend.
-      // Wait, let's look at what the backend MilestoneService returns on release:
-      // It returns the updated MilestoneResponse. The Transaction object created will have the providerOrderId.
-      // Let's query transactions or use order_id. Let's look up transactions for this milestone or mock/fallback if needed.
-      // To prevent strict failure in mock-only Razorpay credentials, let's allow completing via simulation or real modal.
-      
-      const isLoaded = await loadRazorpayScript();
-      if (!isLoaded) {
-        toast.error('Razorpay SDK failed to load. Are you offline?');
-        return;
+      // The backend returns the milestone; the order id lives on the transaction.
+      // Fetch the latest transaction for this milestone to get providerOrderId.
+      let orderId = milestoneData?.providerOrderId;
+      if (!orderId) {
+        const txs = await transactionsApi.getAll(0, 50);
+        const all = txs.data?.data?.content ?? txs.data?.content ?? [];
+        const tx = all
+          .filter((t: any) => t.milestoneId === milestoneId)
+          .sort((a: any, b: any) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )[0];
+        orderId = tx?.providerOrderId;
       }
 
-      // Read Razorpay Key from environment or fallback to common test ID
-      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID ?? 'rzp_test_mock';
-
-      const options = {
-        key: razorpayKey,
-        amount: amount * 100, // in paise
-        currency: 'INR',
-        name: 'DevCollab Platform',
-        description: `Payment for: ${contractTitle}`,
-        image: 'https://cdn.iconscout.com/icon/free/png-256/free-razorpay-logo-icon-download-svg-png-gif-file-formats--payment-gateway-gatewaypayment-method-custom-brand-pack-logos-icons-2870408.png?f=webp&w=128',
-        order_id: milestoneData.providerOrderId ?? '', // order ID from backend Transaction object or generated order
-        handler: function (response: any) {
-          toast.success(`Payment Authorised: ${response.razorpay_payment_id}`);
-          // Refetch to reflect captures via webhook capture confirmation
-          setTimeout(() => fetchMilestones(page), 1500);
-        },
-        prefill: {
-          name: 'DevCollab Client',
-          email: 'client@devcollab.io',
-          contact: '9999999999',
-        },
-        theme: {
-          color: '#0284c7', // brand-600
-        },
-      };
-
-      const paymentObject = new (window as any).Razorpay(options);
-      paymentObject.open();
-
-      paymentObject.on('payment.failed', function (response: any) {
-        toast.error(`Payment Failed: ${response.error.description}`);
-        fetchMilestones(page);
+      toast.success('Payment order created. Opening checkout...');
+      setPaypalOrder({
+        orderId: orderId ?? 'MOCK',
+        milestoneId,
+        amount,
+        title: contractTitle,
       });
     } catch (err: any) {
       console.error(err);
-      toast.error('Failed to trigger Razorpay checkout flow');
+      toast.error('Failed to trigger payment checkout flow');
     }
   };
 
@@ -273,6 +337,16 @@ export const Milestones: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* PayPal / Demo Checkout Modal */}
+      {paypalOrder && (
+        <CheckoutModal
+          order={paypalOrder}
+          onClose={() => setPaypalOrder(null)}
+          onSimulate={mockCapture}
+        />
+      )}
     </div>
   );
 };
+

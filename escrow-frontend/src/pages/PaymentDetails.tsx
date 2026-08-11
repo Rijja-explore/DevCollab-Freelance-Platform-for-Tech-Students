@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { transactionsApi } from '../api/client';
 import { useApi } from '../hooks/useApi';
@@ -106,11 +106,11 @@ export const PaymentDetails: React.FC = () => {
           </h3>
           <div className="space-y-3 text-xs">
             <div className="flex items-center justify-between py-1 border-b border-white/10">
-              <span className="text-slate-500">Razorpay Order ID</span>
+<span className="text-slate-500">Provider Order ID</span>
               <span className="font-mono text-slate-300">{tx.providerOrderId ?? '--'}</span>
             </div>
             <div className="flex items-center justify-between py-1 border-b border-white/10">
-              <span className="text-slate-500">Razorpay Payment ID</span>
+              <span className="text-slate-500">Provider Payment ID</span>
               <span className="font-mono text-slate-300">{tx.providerPaymentId ?? '--'}</span>
             </div>
             <div className="flex items-center justify-between py-1">
@@ -126,8 +126,8 @@ export const PaymentDetails: React.FC = () => {
             Fintech Webhook Compliance
           </h3>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Payment capture matches are received asynchronously via active HMAC webhooks. Signature verify
-            guarantees that all events originate directly from Razorpay Test servers.
+Payment capture matches are received asynchronously via active HMAC webhooks. Signature verify
+            guarantees that all events originate directly from the configured payment provider servers.
           </p>
           {tx.failureReason && (
             <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-lg">

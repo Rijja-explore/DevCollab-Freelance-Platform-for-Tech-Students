@@ -73,7 +73,7 @@ public class MilestoneController {
 
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('STARTUP', 'ADMIN')")
-    @Operation(summary = "Approve a submitted milestone and create a Razorpay payment order")
+    @Operation(summary = "Approve a submitted milestone and create a payment order")
     public ResponseEntity<ApiResponse<MilestoneResponse>> approveMilestone(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserPrincipal principal) {

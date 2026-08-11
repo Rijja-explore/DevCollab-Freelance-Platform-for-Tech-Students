@@ -13,19 +13,19 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Razorpay webhook endpoint.
+ * Payment provider webhook endpoint.
  *
  * IMPORTANT: This endpoint bypasses JWT authentication.
- * It is secured via HMAC-SHA256 signature verification instead.
+ * It is secured via provider signature verification instead.
  *
- * The request body must be read as raw bytes to preserve the exact payload
- * for HMAC computation — any JSON parsing before verification would invalidate the check.
+ * For PayPal, the request body is read as raw bytes to preserve exact payload
+ * for signature verification — any JSON parsing before verification would invalidate the check.
  */
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Payments Webhook", description = "Razorpay payment webhook receiver")
+@Tag(name = "Payments Webhook", description = "Payment provider webhook receiver")
 public class WebhookController {
 
     private final WebhookVerifier webhookVerifier;
@@ -33,19 +33,25 @@ public class WebhookController {
     private final AuditService auditService;
 
     @PostMapping(value = "/webhook", consumes = "application/json")
-    @Operation(summary = "Razorpay webhook receiver — JWT bypassed, HMAC verified")
+    @Operation(summary = "Payment provider webhook receiver — JWT bypassed, signature verified")
     public ResponseEntity<ApiResponse<Void>> handleWebhook(
             @RequestBody String rawPayload,
-            @RequestHeader(value = "X-Razorpay-Signature", required = false) String signature) {
+            @RequestHeader(value = "PayPal-Transmission-Id", required = false) String transmissionId,
+            @RequestHeader(value = "PayPal-Transmission-Time", required = false) String transmissionTime,
+            @RequestHeader(value = "PayPal-Cert-Url", required = false) String certUrl,
+            @RequestHeader(value = "PayPal-Auth-Algo", required = false) String authAlgo,
+            @RequestHeader(value = "PayPal-Transmission-Sig", required = false) String transmissionSig,
+            @RequestHeader(value = "PayPal-Webhook-Id", required = false) String webhookId) {
 
-        log.info("Webhook received. Signature header present: {}", signature != null);
+        log.info("Webhook received. Transmission sig present: {}", transmissionSig != null);
 
-        // Step 1: Verify HMAC signature
-        webhookVerifier.verify(rawPayload, signature);
+        // Step 1: Verify signature
+        webhookVerifier.verify(rawPayload, transmissionId, transmissionTime,
+                certUrl, authAlgo, transmissionSig, webhookId);
 
         // Step 2: Log receipt (after verification)
-        auditService.log("WEBHOOK", "razorpay",
-                AuditAction.WEBHOOK_VERIFIED, "razorpay",
+        auditService.log("WEBHOOK", "paypal",
+                AuditAction.WEBHOOK_VERIFIED, "paypal",
                 "Webhook signature verified. Processing payload.");
 
         // Step 3: Process event

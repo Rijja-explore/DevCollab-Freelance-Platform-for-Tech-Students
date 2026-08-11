@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Getter
 @Builder
@@ -15,6 +16,8 @@ public class PaymentResult {
     private BigDecimal amount;
     private String currency;
     private String status;
+    private String approveUrl;
+    private List<String> approvedLinks;
     private String failureReason;
 
     public static PaymentResult failure(String reason) {

@@ -4,7 +4,9 @@ import com.devcollab.escrow.enums.TransactionStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -49,13 +51,14 @@ public class Transaction {
     private String currency = "INR";
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private TransactionStatus status = TransactionStatus.INITIATED;
 
     @Column(name = "provider", nullable = false, length = 50)
     @Builder.Default
-    private String provider = "RAZORPAY";
+    private String provider = "PAYPAL";
 
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
