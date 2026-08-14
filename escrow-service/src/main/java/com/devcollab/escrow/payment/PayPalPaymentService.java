@@ -23,10 +23,10 @@ import java.util.List;
  * Activated when {@code payment.provider=paypal}.
  *
  * Order flow:
- * 1. createOrder() →  POST /v2/checkout/orders (intent CAPTURE)
+ * 1. createOrder() â†’  POST /v2/checkout/orders (intent CAPTURE)
  *                     Returns order id + approve URL for the JS SDK.
  * 2. Frontend loads the PayPal JS SDK with the client id and renders the button.
- * 3. Payer approves on PayPal → frontend captures via POST /v2/checkout/orders/{id}/capture
+ * 3. Payer approves on PayPal â†’ frontend captures via POST /v2/checkout/orders/{id}/capture
  *    (or PayPal notifies via a PAYMENT.CAPTURE.COMPLETED webhook).
  * 4. verifyWebhookSignature() validates the PayPal webhook transmission headers.
  *
@@ -87,7 +87,11 @@ public class PayPalPaymentService implements PaymentService {
             applicationContext.put("shipping_preference", "NO_SHIPPING");
             applicationContext.put("user_action", "PAY_NOW");
 
-            log.info("Creating PayPal order for milestone: {}, custom_id: {}",
+            
+        // PayPal browser redirect URLs
+        applicationContext.put("return_url", "http://localhost:3000/payment/success");
+        applicationContext.put("cancel_url", "http://localhost:3000/payment/cancel");
+log.info("Creating PayPal order for milestone: {}, custom_id: {}",
                     request.getMilestoneId(), request.getMilestoneId());
 
             JsonNode response = paypalWebClient.post()
@@ -206,7 +210,7 @@ public class PayPalPaymentService implements PaymentService {
                 webhookId = this.webhookId;
             }
             if (webhookId == null || webhookId.isBlank()) {
-                log.warn("PayPal webhook-id not configured — cannot verify signature");
+                log.warn("PayPal webhook-id not configured â€” cannot verify signature");
                 return false;
             }
 
@@ -281,4 +285,7 @@ public class PayPalPaymentService implements PaymentService {
         }
     }
 }
+
+
+
 

@@ -227,6 +227,7 @@ public class MilestoneService {
         Transaction transaction = Transaction.builder()
                 .milestone(milestone)
                 .providerOrderId(result.isSuccess() ? result.getOrderId() : null)
+            .approveUrl(result.isSuccess() ? result.getApproveUrl() : null)
                 .amount(milestone.getAmount())
                 .currency(milestone.getContract().getCurrency())
                 .status(result.isSuccess() ? TransactionStatus.PENDING : TransactionStatus.FAILED)
@@ -332,3 +333,4 @@ public class MilestoneService {
                 .orElseThrow(() -> new ResourceNotFoundException("Milestone", milestoneId.toString()));
     }
 }
+

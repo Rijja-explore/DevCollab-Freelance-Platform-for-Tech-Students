@@ -41,6 +41,9 @@ public class Transaction {
     @Column(name = "provider_order_id", length = 100)
     private String providerOrderId;
 
+    @Column(name = "approve_url", length = 1000)
+    private String approveUrl;
+
     @Column(name = "provider_payment_id", length = 100)
     private String providerPaymentId;
 
@@ -77,3 +80,7 @@ public class Transaction {
     @Column(name = "completed_at")
     private Instant completedAt;
 }
+
+
+
+

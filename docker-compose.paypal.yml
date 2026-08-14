@@ -1,0 +1,4 @@
+services:
+  escrow-service:
+    environment:
+      PAYMENT_PROVIDER: paypal

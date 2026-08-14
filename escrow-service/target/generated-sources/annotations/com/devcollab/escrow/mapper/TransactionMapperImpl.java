@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-08-12T03:26:14+0530",
+    date = "2026-08-12T13:31:29+0530",
     comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.12 (Oracle Corporation)"
 )
 @Component
@@ -29,6 +29,7 @@ public class TransactionMapperImpl implements TransactionMapper {
         transactionResponse.id( transaction.getId() );
         transactionResponse.providerTransactionId( transaction.getProviderTransactionId() );
         transactionResponse.providerOrderId( transaction.getProviderOrderId() );
+        transactionResponse.approveUrl( transaction.getApproveUrl() );
         transactionResponse.providerPaymentId( transaction.getProviderPaymentId() );
         transactionResponse.amount( transaction.getAmount() );
         transactionResponse.currency( transaction.getCurrency() );

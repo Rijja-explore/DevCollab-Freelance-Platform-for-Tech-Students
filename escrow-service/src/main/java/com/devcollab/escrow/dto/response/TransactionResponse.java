@@ -18,6 +18,7 @@ public class TransactionResponse {
     private UUID milestoneId;
     private String providerTransactionId;
     private String providerOrderId;
+private String approveUrl;
     private String providerPaymentId;
     private BigDecimal amount;
     private String currency;
@@ -27,3 +28,7 @@ public class TransactionResponse {
     private Instant createdAt;
     private Instant completedAt;
 }
+
+
+
+
