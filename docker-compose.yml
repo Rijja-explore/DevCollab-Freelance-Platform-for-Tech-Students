@@ -1,0 +1,25 @@
+services:
+  auth-service:
+    build: .
+    ports:
+      - "8081:8081"
+    environment:
+      DB_HOST: mysql
+      DB_NAME: auth_db
+      DB_USERNAME: auth_user
+      DB_PASSWORD: auth_pass
+      RABBITMQ_HOST: rabbitmq
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: auth_db
+      MYSQL_USER: auth_user
+      MYSQL_PASSWORD: auth_pass
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
