@@ -20,7 +20,7 @@ const isPayPalConfigured = Boolean(import.meta.env.VITE_PAYPAL_CLIENT_ID);
 interface CheckoutModalProps {
   order: any;
   onClose: () => void;
-  onSimulate: (milestoneId: string, amount: number, orderId: string) => void;
+  onCapture: (transactionId: string) => Promise<void>;
 }
 
 /**
@@ -30,7 +30,7 @@ interface CheckoutModalProps {
  * PayPalScriptProvider is mounted (App.tsx). Otherwise renders a mock
  * "Simulate Payment" button for offline demos.
  */
-const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onSimulate }) => {
+const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onCapture }) => {
   // usePayPalScriptReducer is only valid when PayPalScriptProvider is mounted.
   const scriptState = isPayPalConfigured
     ? usePayPalScriptReducer()
@@ -71,7 +71,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onSimulat
                 createOrder={() => order.orderId}
                 onApprove={async () => {
                   toast.success('Payment approved. Capturing...');
-                  await onSimulate(order.milestoneId, order.amount, order.orderId);
+                  await onCapture(order.transactionId);
                 }}
                 onCancel={() => {
                   toast('Payment cancelled.', { icon: '❌' });
@@ -90,7 +90,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onSimulat
                 configured, so checkout is simulated.
               </p>
               <button
-                onClick={() => onSimulate(order.milestoneId, order.amount, order.orderId)}
+                onClick={() => onCapture(order.transactionId)}
                 className="btn-primary w-full"
               >
                 Simulate Payment Capture
@@ -140,15 +140,16 @@ export const Milestones: React.FC = () => {
     }
   }, [page, contractIdParam, fetchMilestones]);
 
-  // Simulates capture for mock/demo provider (also finalizes after PayPal approval
-  // when a webhook isn't reachable in local dev).
-  const mockCapture = async (milestoneId: string, amount: number, orderId: string) => {
-    void milestoneId;
-    void amount;
-    toast.success(`Payment captured · ${orderId} (mock/demo)`);
-    setPaypalOrder(null);
-    // Refresh to reflect webhook/state changes
-    setTimeout(() => fetchMilestones(page), 1800);
+  const capturePayment = async (transactionId: string) => {
+    try {
+      await transactionsApi.capture(transactionId);
+      toast.success('Payment captured and escrow released.');
+      setPaypalOrder(null);
+      fetchMilestones(page);
+    } catch (err) {
+      console.error(err);
+      toast.error('The payment could not be captured. Its status was not marked successful.');
+    }
   };
 
   const handlePay = async (milestoneId: string, amount: number, contractTitle: string) => {
@@ -159,7 +160,8 @@ export const Milestones: React.FC = () => {
       // The backend returns the milestone; the order id lives on the transaction.
       // Fetch the latest transaction for this milestone to get providerOrderId.
       let orderId = milestoneData?.providerOrderId;
-      if (!orderId) {
+      let transactionId = milestoneData?.transactionId;
+      if (!orderId || !transactionId) {
         const txs = await transactionsApi.getAll(0, 50);
         const all = txs.data?.data?.content ?? txs.data?.content ?? [];
         const tx = all
@@ -168,11 +170,17 @@ export const Milestones: React.FC = () => {
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           )[0];
         orderId = tx?.providerOrderId;
+        transactionId = tx?.id;
+      }
+
+      if (!orderId || !transactionId) {
+        throw new Error('Payment order was created but its transaction could not be retrieved');
       }
 
       toast.success('Payment order created. Opening checkout...');
       setPaypalOrder({
-        orderId: orderId ?? 'MOCK',
+        orderId,
+        transactionId,
         milestoneId,
         amount,
         title: contractTitle,
@@ -343,7 +351,7 @@ export const Milestones: React.FC = () => {
         <CheckoutModal
           order={paypalOrder}
           onClose={() => setPaypalOrder(null)}
-          onSimulate={mockCapture}
+          onCapture={capturePayment}
         />
       )}
     </div>

@@ -79,5 +79,6 @@ public class Milestone {
     private Instant updatedAt;
 
     @OneToMany(mappedBy = "milestone", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
     private java.util.List<Transaction> transactions = new java.util.ArrayList<>();
 }

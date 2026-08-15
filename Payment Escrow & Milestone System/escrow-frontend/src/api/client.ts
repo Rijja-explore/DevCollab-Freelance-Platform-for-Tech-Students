@@ -78,6 +78,8 @@ export const transactionsApi = {
     client.get(`/api/transactions?page=${page}&size=${size}`),
   getById: (id: string) =>
     client.get(`/api/transactions/${id}`),
+  capture: (id: string) =>
+    client.post(`/api/transactions/${id}/capture`),
   getByContract: (contractId: string, page = 0) =>
     client.get(`/api/transactions/contract/${contractId}?page=${page}`),
 }

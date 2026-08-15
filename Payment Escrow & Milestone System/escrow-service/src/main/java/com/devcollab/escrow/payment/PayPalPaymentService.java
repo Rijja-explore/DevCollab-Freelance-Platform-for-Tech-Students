@@ -56,6 +56,12 @@ public class PayPalPaymentService implements PaymentService {
     @Value("${paypal.webhook-id:}")
     private String webhookId;
 
+    @Value("${paypal.return-url}")
+    private String returnUrl;
+
+    @Value("${paypal.cancel-url}")
+    private String cancelUrl;
+
     @Override
     public String getProviderName() {
         return PROVIDER_NAME;
@@ -88,10 +94,9 @@ public class PayPalPaymentService implements PaymentService {
             applicationContext.put("user_action", "PAY_NOW");
 
             
-        // PayPal browser redirect URLs
-        applicationContext.put("return_url", "http://localhost:3000/payment/success");
-        applicationContext.put("cancel_url", "http://localhost:3000/payment/cancel");
-log.info("Creating PayPal order for milestone: {}, custom_id: {}",
+            applicationContext.put("return_url", returnUrl);
+            applicationContext.put("cancel_url", cancelUrl);
+            log.info("Creating PayPal order for milestone: {}, custom_id: {}",
                     request.getMilestoneId(), request.getMilestoneId());
 
             JsonNode response = paypalWebClient.post()

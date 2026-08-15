@@ -121,6 +121,8 @@ paypal:
   currency: ${PAYPAL_CURRENCY:USD}
   webhook-id: ${PAYPAL_WEBHOOK_ID:}
   base-url: ${PAYPAL_BASE_URL:}
+  return-url: ${PAYPAL_RETURN_URL:http://localhost:5173/milestones?payment=success}
+  cancel-url: ${PAYPAL_CANCEL_URL:http://localhost:5173/milestones?payment=cancelled}
 
 # ─────────────────────────────────────────────────────────
 #  DevCollab Escrow Config

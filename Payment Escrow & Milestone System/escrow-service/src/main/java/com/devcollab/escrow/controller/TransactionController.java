@@ -4,6 +4,7 @@ import com.devcollab.escrow.dto.response.ApiResponse;
 import com.devcollab.escrow.dto.response.PageResponse;
 import com.devcollab.escrow.dto.response.TransactionResponse;
 import com.devcollab.escrow.service.TransactionService;
+import com.devcollab.escrow.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import java.util.UUID;
 
@@ -39,6 +41,16 @@ public class TransactionController {
     @Operation(summary = "Get transaction by ID")
     public ResponseEntity<ApiResponse<TransactionResponse>> getTransaction(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(transactionService.getById(id)));
+    }
+
+    @PostMapping("/{id}/capture")
+    @PreAuthorize("hasAnyRole('STARTUP', 'ADMIN')")
+    @Operation(summary = "Capture an approved payment order")
+    public ResponseEntity<ApiResponse<TransactionResponse>> captureTransaction(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        String actor = principal != null ? principal.getEmail() : "system";
+        return ResponseEntity.ok(ApiResponse.success(transactionService.capture(id, actor), "Payment captured"));
     }
 
     @GetMapping("/contract/{contractId}")
