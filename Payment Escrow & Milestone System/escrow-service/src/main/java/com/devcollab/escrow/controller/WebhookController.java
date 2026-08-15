@@ -32,11 +32,10 @@ public class WebhookController {
     private final WebhookProcessor webhookProcessor;
     private final AuditService auditService;
 
-    @PostMapping(value = {"/webhook", "/webhook/*", "/webhook/razorpay"}, consumes = "application/json")
+    @PostMapping(value = "/webhook", consumes = "application/json")
     @Operation(summary = "Payment provider webhook receiver — JWT bypassed, signature verified")
     public ResponseEntity<ApiResponse<Void>> handleWebhook(
             @RequestBody String rawPayload,
-            @RequestHeader(value = "X-Razorpay-Signature", required = false) String razorpaySignature,
             @RequestHeader(value = "PayPal-Transmission-Id", required = false) String transmissionId,
             @RequestHeader(value = "PayPal-Transmission-Time", required = false) String transmissionTime,
             @RequestHeader(value = "PayPal-Cert-Url", required = false) String certUrl,
@@ -44,17 +43,15 @@ public class WebhookController {
             @RequestHeader(value = "PayPal-Transmission-Sig", required = false) String transmissionSig,
             @RequestHeader(value = "PayPal-Webhook-Id", required = false) String webhookId) {
 
-        String sig = (razorpaySignature != null && !razorpaySignature.isBlank()) ? razorpaySignature : transmissionSig;
-
-        log.info("Webhook received. Provider sig present: {}", sig != null);
+        log.info("PayPal webhook received. Transmission signature present: {}", transmissionSig != null);
 
         // Step 1: Verify signature
         webhookVerifier.verify(rawPayload, transmissionId, transmissionTime,
-                certUrl, authAlgo, sig, webhookId);
+                certUrl, authAlgo, transmissionSig, webhookId);
 
         // Step 2: Log receipt (after verification)
-        auditService.log("WEBHOOK", razorpaySignature != null ? "razorpay" : "provider",
-                AuditAction.WEBHOOK_VERIFIED, razorpaySignature != null ? "razorpay" : "provider",
+        auditService.log("WEBHOOK", "paypal",
+                AuditAction.WEBHOOK_VERIFIED, "paypal",
                 "Webhook signature verified. Processing payload.");
 
         // Step 3: Process event

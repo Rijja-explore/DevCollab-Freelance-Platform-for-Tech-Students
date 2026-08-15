@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     amount                  DECIMAL(19, 4) NOT NULL,
     currency                VARCHAR(3)     NOT NULL DEFAULT 'INR',
     status                  VARCHAR(20)    NOT NULL DEFAULT 'INITIATED',
-    provider                VARCHAR(50)    NOT NULL DEFAULT 'RAZORPAY',
+    provider                VARCHAR(50)    NOT NULL DEFAULT 'PAYPAL',
     failure_reason          VARCHAR(500),
     webhook_payload         TEXT,
     idempotency_key         VARCHAR(100)   UNIQUE,

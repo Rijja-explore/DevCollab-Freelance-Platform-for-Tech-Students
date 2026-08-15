@@ -51,8 +51,6 @@ public class WebhookProcessor {
             switch (eventType) {
                 case "PAYMENT.CAPTURE.COMPLETED" -> handleCaptureCompleted(root.path("resource"));
                 case "PAYMENT.CAPTURE.DENIED" -> handleCaptureDenied(root.path("resource"));
-                case "payment.captured", "order.paid" -> handleRazorpayCaptured(root);
-                case "payment.failed" -> handleRazorpayFailed(root);
                 default -> {
                     // Generic fallback for custom/mock test webhooks
                     if (root.has("milestone_id") || root.has("milestoneId")) {
@@ -67,45 +65,6 @@ public class WebhookProcessor {
             log.error("Error processing webhook payload: {}", e.getMessage(), e);
             throw new RuntimeException("Webhook processing failed: " + e.getMessage(), e);
         }
-    }
-
-    private void handleRazorpayCaptured(JsonNode root) {
-        JsonNode entity = root.path("payload").path("payment").path("entity");
-        String paymentId = entity.path("id").asText();
-        String orderId = entity.path("order_id").asText();
-        String milestoneIdStr = entity.path("notes").path("milestone_id").asText();
-
-        if (paymentId.isBlank()) {
-            paymentId = root.path("payment_id").asText(root.path("id").asText("pay_" + UUID.randomUUID()));
-        }
-        if (orderId.isBlank()) {
-            orderId = root.path("order_id").asText("order_mock");
-        }
-        if (milestoneIdStr.isBlank()) {
-            milestoneIdStr = root.path("milestone_id").asText(root.path("milestoneId").asText());
-        }
-
-        processPaymentConfirmation(paymentId, orderId, milestoneIdStr, "razorpay");
-    }
-
-    private void handleRazorpayFailed(JsonNode root) {
-        JsonNode entity = root.path("payload").path("payment").path("entity");
-        String paymentId = entity.path("id").asText(root.path("payment_id").asText());
-        String reason = entity.path("error_description").asText(root.path("reason").asText("Payment failed"));
-
-        if (processedEventRepository.existsByEventId("denied:" + paymentId)) {
-            return;
-        }
-
-        processedEventRepository.save(ProcessedEvent.builder()
-                .eventId("denied:" + paymentId)
-                .eventType("payment.failed")
-                .producer("razorpay")
-                .build());
-
-        auditService.log("TRANSACTION", paymentId,
-                AuditAction.PAYMENT_FAILED, "razorpay",
-                "Payment failed: " + reason);
     }
 
     private void handleGenericWebhook(JsonNode root) {

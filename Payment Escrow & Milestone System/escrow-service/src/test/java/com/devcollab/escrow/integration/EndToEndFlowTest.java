@@ -103,12 +103,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "paypal.client-secret=mock_client_secret",
         "paypal.mode=sandbox",
         "paypal.webhook-id=mock_webhook_id",
-        "razorpay.key-secret=test_secret",
-        "razorpay.webhook-secret=test_webhook_secret_key_123",
         // ── Rate limiter ──────────────────────────────────────────────────
         "rate-limiter.max-requests-per-minute=1000"
 })
-@DisplayName("Person C — End-to-End Business Flow Integration Test")
 public class EndToEndFlowTest {
 
     // ── Mock out AMQP consumers and publisher (no broker needed) ──────────
@@ -330,7 +327,7 @@ public class EndToEndFlowTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(webhookPayload)
                         // Mock provider passes any non-null signature
-                        .header("X-Razorpay-Signature", "mock_sig_valid"))
+                        .header("PayPal-Transmission-Sig", "mock_sig_valid"))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -362,14 +359,14 @@ public class EndToEndFlowTest {
         mockMvc.perform(post("/api/payments/webhook")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(webhookPayload)
-                        .header("X-Razorpay-Signature", "mock_sig_valid"))
+                        .header("PayPal-Transmission-Sig", "mock_sig_valid"))
                 .andExpect(status().isOk());
 
         // Second call — must be idempotent
         mockMvc.perform(post("/api/payments/webhook")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(webhookPayload)
-                        .header("X-Razorpay-Signature", "mock_sig_valid"))
+                        .header("PayPal-Transmission-Sig", "mock_sig_valid"))
                 .andExpect(status().isOk());
 
         // Milestone still RELEASED — never double-released
@@ -498,3 +495,4 @@ public class EndToEndFlowTest {
         assertThat(contracts).hasSize(1);
     }
 }
+

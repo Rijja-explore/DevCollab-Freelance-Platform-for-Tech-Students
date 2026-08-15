@@ -5,9 +5,7 @@ import java.util.List;
 /**
  * Gateway-agnostic payment abstraction.
  *
- * Allows swapping PayPal for Stripe, Mock, or other providers without touching
- * service logic. The concrete implementation is selected at runtime via the
- * {@code payment.provider} configuration property.
+ * Payment abstraction used by PayPal Checkout and the local development mock.
  *
  * Implementations:
 *  - {@link PayPalPaymentService}  — real PayPal Checkout Orders REST API (WebClient)

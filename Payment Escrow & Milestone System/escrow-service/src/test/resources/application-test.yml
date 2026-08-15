@@ -52,11 +52,6 @@ paypal:
   mode: sandbox
   webhook-id: mock_webhook_id
 
-razorpay:
-  key-id: mock_key_id
-  key-secret: test_secret
-  webhook-secret: test_webhook_secret_key_123
-
 rate-limiter:
   max-requests-per-minute: 1000
 

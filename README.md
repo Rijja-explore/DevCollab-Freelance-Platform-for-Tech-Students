@@ -1,11 +1,11 @@
 # DevCollab Freelance Platform
 
-DevCollab is a microservice-based platform for technical students and startups. This repository currently contains the identity foundation (Person A) and the contract, milestone, and escrow payment service (Person C).
+DevCollab is a microservice-based platform for technical students and startups. This repository currently contains an identity service and the contract, milestone, and escrow payment service.
 
 ## Architecture
 
 ```text
-Auth service (Person A, :8081) -- RS256 JWT --> Escrow service (Person C, :8080)
+Identity service (:8081) -- RS256 JWT --> Escrow service (:8080)
                                               |
 React escrow SPA (:5173) -- /api proxy -------+
                                               |
@@ -14,14 +14,14 @@ React escrow SPA (:5173) -- /api proxy -------+
                                   PayPal Sandbox or mock provider
 ```
 
-The escrow service consumes `project.matched`, stores the external project, startup, and student UUIDs on a contract, and publishes `payment.released` / `payment.failed`. Person B should preserve those event names and UUID fields.
+The escrow service consumes `project.matched`, stores the external project, startup, and student UUIDs on a contract, and publishes `payment.released` / `payment.failed`.
 
 ## Repository structure
 
-- `Discovery & Matching/` — Spring Boot authentication and JWKS service (Person A).
-- `Payment Escrow & Milestone System/escrow-service/` — Spring Boot contracts, milestones, transactions, payment adapters, migrations, and AMQP consumers (Person C).
+- `Discovery & Matching/` — Spring Boot authentication and JWKS service. Discovery, matching, GraphQL, PostgreSQL, Elasticsearch, and Redis are not implemented in the committed source.
+- `Payment Escrow & Milestone System/escrow-service/` — Spring Boot contracts, milestones, transactions, PayPal adapter, migrations, and AMQP consumers.
 - `Payment Escrow & Milestone System/escrow-frontend/` — React/Vite dashboard for contracts, milestones, transactions, and audit logs.
-- `Payment Escrow & Milestone System/API.md` and `EVENTS.md` — detailed API and event contracts.
+- The root README is the source of truth for service, API, and event integration guidance.
 
 ## Technologies
 
@@ -38,7 +38,7 @@ Copy `Payment Escrow & Milestone System/.env.example` to `.env` in that director
 
 Important variables: `PAYMENT_PROVIDER` (`mock` or `paypal`), `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_MODE=sandbox`, `PAYPAL_CURRENCY`, `PAYPAL_WEBHOOK_ID`, `PAYPAL_RETURN_URL`, `PAYPAL_CANCEL_URL`, database/RabbitMQ variables, `JWT_ISSUER`, and `JWT_PUBLIC_KEY`. `VITE_PAYPAL_CLIENT_ID` is public client configuration; the secret is backend-only.
 
-## Run Person C locally
+## Run the Escrow service locally
 
 PowerShell:
 
@@ -63,14 +63,16 @@ npm run dev
 
 On Linux/macOS use `./mvnw` and the same `npm` commands.
 
-## Run Person A
+## Run the identity service
 
 ```powershell
 cd "Discovery & Matching"
 docker compose up --build
 ```
 
-This compose file binds MySQL and RabbitMQ to the same host ports as Person C’s compose stack. Run one stack at a time, or change the published ports before running both. To integrate JWTs, configure the escrow service with the exact public key used by the auth service and `JWT_ISSUER=devcollab-auth`.
+This compose file binds MySQL and RabbitMQ to the same host ports as the escrow stack. Run one stack at a time, or change the published ports before running both. To integrate JWTs, configure the escrow service with the exact public key used by the identity service and `JWT_ISSUER=devcollab-auth`.
+
+> Current limitation: the committed identity service generates an ephemeral signing key and returns an empty JWKS document. It cannot yet provide the stable public key required for a running escrow integration. Configure a persisted RSA key/JWKS implementation before enabling cross-service JWT authentication.
 
 ## Escrow lifecycle
 
@@ -114,6 +116,6 @@ npm run build
 - A webhook is rejected: register the webhook ID and preserve the raw payload plus PayPal transmission headers.
 - Authentication fails: confirm the escrow public key matches the auth service signing key and issuer.
 
-## Person B handoff
+## Integration contract
 
-Person B can consume `payment.released` and `payment.failed`, publish `milestone.completed`, and use Person C contract/milestone UUIDs as opaque identifiers. Preserve the event schemas in `EVENTS.md`, the `Idempotency-Key` behavior, transaction status semantics, and the capture endpoint; do not set a milestone to `RELEASED` from the frontend or from an unverified event.
+The collaboration service can consume `payment.released` and `payment.failed`, publish `milestone.completed`, and use contract/milestone UUIDs as opaque identifiers. Preserve the `Idempotency-Key` behavior, transaction status semantics, and the capture endpoint; do not set a milestone to `RELEASED` from the frontend or from an unverified event.
