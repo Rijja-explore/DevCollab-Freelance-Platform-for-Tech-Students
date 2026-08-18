@@ -2,68 +2,84 @@ import 'dotenv/config';
 import http from 'http';
 import { Server } from 'socket.io';
 import createApp from './src/app.js';
-import { connectDatabase } from './src/config/database.js';
-import { initializeRedis } from './src/config/redis.js';
+import { connectDatabase, disconnectDatabase } from './src/config/database.js';
+import { initializeRedis, disconnectRedis } from './src/config/redis.js';
 import { validateEnvironment } from './src/config/environment.js';
+import { logServiceConfiguration } from './src/config/services.js';
 import { logger } from './src/utils/logger.js';
+import { initializeSocket } from './src/sockets/index.js';
+import { connectRabbitMQ, disconnectRabbitMQ } from './src/messaging/rabbitmq.js';
+import { startConsumers } from './src/messaging/consumer.js';
 
 /**
  * Server Initialization
- * 
- * This is the entry point for the backend service.
- * It orchestrates:
- * 1. Environment validation
- * 2. Database and cache connections
- * 3. HTTP server setup with Express
- * 4. Socket.io initialization (for later)
- * 5. Graceful shutdown handling
+ *
+ * Startup sequence:
+ *  1. Validate environment variables (fast-fail on missing config)
+ *  2. Connect MongoDB
+ *  3. Connect Redis
+ *  4. Connect RabbitMQ + start consumers
+ *  5. Start HTTP server + Socket.IO
  */
 
-const PORT = process.env.PORT || 5000;
+const PORT     = process.env.PORT     || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Create Express app
-const app = createApp();
-
-// Create HTTP server
+const app    = createApp();
 const server = http.createServer(app);
 
-// Initialize Socket.io (for later implementation)
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || '*',
+    origin:      process.env.CORS_ORIGIN || '*',
     credentials: true,
   },
 });
 
-/**
- * Startup sequence
- */
+// ── Startup ───────────────────────────────────────────────────────────────────
+
 const startServer = async () => {
   try {
     logger.info('🚀 Starting Workspace Service...');
     logger.info(`📍 Environment: ${NODE_ENV}`);
 
+    // 1. Validate env
     validateEnvironment();
 
-    // Connect to MongoDB
+    // Log external service config
+    logServiceConfiguration();
+
+    // 2. MongoDB
     logger.info('🗄️  Connecting to MongoDB...');
     await connectDatabase();
     logger.info('✅ MongoDB connected');
 
-    // Connect to Redis
+    // 3. Redis
     logger.info('💾 Connecting to Redis...');
-    const redisClient = await initializeRedis();
+    await initializeRedis();
     logger.info('✅ Redis connected');
 
-    // Start HTTP server
+    // 4. RabbitMQ
+    logger.info('🐇 Connecting to RabbitMQ...');
+    await connectRabbitMQ();
+    logger.info('✅ RabbitMQ connected');
+
+    logger.info('📨 Starting RabbitMQ consumers...');
+    await startConsumers();
+    logger.info('✅ RabbitMQ consumers started');
+
+    // 5. Socket.IO
+    logger.info('🔌 Setting up Socket.IO...');
+    initializeSocket(io);
+
+    // Make io available to any request handler that needs it
+    app.locals.io = io;
+
+    // 6. HTTP server
     server.listen(PORT, () => {
       logger.info(`✅ Server running on port ${PORT}`);
       logger.info(`📊 Health check: GET http://localhost:${PORT}/health`);
+      logger.info(`🔌 Socket.IO ready for connections`);
     });
-
-    // Make io available globally for socket handlers
-    app.locals.io = io;
 
   } catch (error) {
     logger.error('❌ Failed to start server:', error);
@@ -71,23 +87,16 @@ const startServer = async () => {
   }
 };
 
-/**
- * Graceful shutdown
- */
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+
 const shutdown = async (signal) => {
   logger.info(`\n⏹️  ${signal} received. Shutting down gracefully...`);
-
   try {
-    // Close server
-    server.close(() => {
-      logger.info('✅ HTTP server closed');
-    });
+    server.close(() => logger.info('✅ HTTP server closed'));
 
-    // Disconnect database
-    // (Will be implemented when database connection is added)
-    
-    // Disconnect Redis
-    // (Will be implemented when Redis connection is added)
+    await disconnectRabbitMQ();
+    await disconnectDatabase();
+    await disconnectRedis();
 
     logger.info('✅ Graceful shutdown complete');
     process.exit(0);
@@ -97,11 +106,9 @@ const shutdown = async (signal) => {
   }
 };
 
-// Handle shutdown signals
 process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
 
-// Start the server
 startServer();
 
 export { server, io };

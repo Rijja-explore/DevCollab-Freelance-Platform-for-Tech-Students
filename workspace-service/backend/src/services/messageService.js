@@ -7,6 +7,7 @@
 
 import { Message, Workspace } from '../models/index.js';
 import { logger } from '../utils/logger.js';
+import notificationClient from '../clients/notificationClient.js';
 
 /**
  * Get all messages for a workspace
@@ -56,6 +57,18 @@ export const createMessage = async (workspaceId, messageData) => {
     // Populate workspace info for response
     await message.populate('workspaceId', 'projectId');
     
+    // Send notification (non-blocking)
+    notificationClient.sendMessageCreated({
+      workspaceId: workspaceId,
+      messageId: message._id.toString(),
+      senderId: message.senderId,
+      text: message.text,
+      type: message.type,
+    }).catch(err => {
+      logger.error('Failed to send message created notification:', err);
+      // Don't fail the request if notification fails
+    });
+    
     return { success: true, data: message, statusCode: 201 };
   } catch (error) {
     logger.error('Error creating message:', error);
@@ -90,6 +103,17 @@ export const editMessage = async (messageId, updateData, userId) => {
     // Populate workspace info for response
     await message.populate('workspaceId', 'projectId');
     
+    // Send notification (non-blocking)
+    notificationClient.sendMessageUpdated({
+      workspaceId: message.workspaceId.toString(),
+      messageId: message._id.toString(),
+      senderId: message.senderId,
+      text: message.text,
+      isEdited: message.isEdited,
+    }).catch(err => {
+      logger.error('Failed to send message updated notification:', err);
+    });
+    
     return { success: true, data: message };
   } catch (error) {
     logger.error('Error editing message:', error);
@@ -118,10 +142,22 @@ export const deleteMessage = async (messageId, userId) => {
       return { success: false, message: 'Forbidden: You can only delete your own messages', statusCode: 403 };
     }
     
+    // Store workspaceId before soft delete
+    const workspaceId = message.workspaceId.toString();
+    
     // Use the model's soft delete method
     await message.softDelete();
     
-    return { success: true, message: 'Message deleted successfully' };
+    // Send notification (non-blocking)
+    notificationClient.sendMessageDeleted({
+      workspaceId: workspaceId,
+      messageId: messageId,
+      senderId: userId,
+    }).catch(err => {
+      logger.error('Failed to send message deleted notification:', err);
+    });
+    
+    return { success: true, message: 'Message deleted successfully', workspaceId };
   } catch (error) {
     logger.error('Error deleting message:', error);
     return { success: false, message: 'Failed to delete message', statusCode: 500 };

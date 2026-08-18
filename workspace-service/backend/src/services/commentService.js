@@ -7,6 +7,7 @@
 
 import { Comment, Workspace } from '../models/index.js';
 import { logger } from '../utils/logger.js';
+import notificationClient from '../clients/notificationClient.js';
 
 /**
  * Get comments for a workspace with nested replies
@@ -73,6 +74,19 @@ export const createComment = async (workspaceId, commentData) => {
     // Populate workspace info for response
     await comment.populate('workspaceId', 'projectId');
     
+    // Send notification (non-blocking)
+    notificationClient.sendCommentCreated({
+      workspaceId: workspaceId,
+      commentId: comment._id.toString(),
+      authorId: comment.authorId,
+      text: comment.text,
+      fileRef: comment.fileRef,
+      lineNumber: comment.lineNumber,
+      parentId: comment.parentId,
+    }).catch(err => {
+      logger.error('Failed to send comment created notification:', err);
+    });
+    
     return { success: true, data: comment, statusCode: 201 };
   } catch (error) {
     logger.error('Error creating comment:', error);
@@ -95,13 +109,28 @@ export const createReply = async (commentId, replyData) => {
       return { success: false, message: 'Cannot reply to deleted comment', statusCode: 400 };
     }
     
+    // Store workspaceId for socket emission
+    const workspaceId = parentComment.workspaceId.toString();
+    
     // Use the model's addReply method
     const reply = await parentComment.addReply(replyData);
     
     // Populate workspace info for response
     await reply.populate('workspaceId', 'projectId');
     
-    return { success: true, data: reply, statusCode: 201 };
+    // Send notification (non-blocking)
+    notificationClient.sendCommentCreated({
+      workspaceId: workspaceId,
+      commentId: reply._id.toString(),
+      authorId: reply.authorId,
+      text: reply.text,
+      parentId: reply.parentId.toString(),
+      isReply: true,
+    }).catch(err => {
+      logger.error('Failed to send reply created notification:', err);
+    });
+    
+    return { success: true, data: reply, statusCode: 201, workspaceId };
   } catch (error) {
     logger.error('Error creating reply:', error);
     return { success: false, message: 'Failed to create reply', statusCode: 500 };
@@ -135,6 +164,17 @@ export const editComment = async (commentId, updateData, userId) => {
     // Populate workspace info for response
     await comment.populate('workspaceId', 'projectId');
     
+    // Send notification (non-blocking)
+    notificationClient.sendCommentUpdated({
+      workspaceId: comment.workspaceId.toString(),
+      commentId: comment._id.toString(),
+      authorId: comment.authorId,
+      text: comment.text,
+      isEdited: comment.isEdited,
+    }).catch(err => {
+      logger.error('Failed to send comment updated notification:', err);
+    });
+    
     return { success: true, data: comment };
   } catch (error) {
     logger.error('Error editing comment:', error);
@@ -163,10 +203,22 @@ export const deleteComment = async (commentId, userId) => {
       return { success: false, message: 'Forbidden: You can only delete your own comments', statusCode: 403 };
     }
     
+    // Store workspaceId before soft delete
+    const workspaceId = comment.workspaceId.toString();
+    
     // Use the model's soft delete method
     await comment.softDelete();
     
-    return { success: true, message: 'Comment deleted successfully' };
+    // Send notification (non-blocking)
+    notificationClient.sendCommentDeleted({
+      workspaceId: workspaceId,
+      commentId: commentId,
+      authorId: userId,
+    }).catch(err => {
+      logger.error('Failed to send comment deleted notification:', err);
+    });
+    
+    return { success: true, message: 'Comment deleted successfully', workspaceId };
   } catch (error) {
     logger.error('Error deleting comment:', error);
     return { success: false, message: 'Failed to delete comment', statusCode: 500 };

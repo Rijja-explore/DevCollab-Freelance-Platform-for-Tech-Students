@@ -3,9 +3,11 @@
  * 
  * Handles HTTP requests for message operations.
  * Thin layer that delegates to services and formats responses.
+ * Emits real-time events after successful operations.
  */
 
 import messageService from '../services/messageService.js';
+import socketEmitter from '../utils/socketEmitter.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -60,6 +62,9 @@ export const createMessage = async (req, res, next) => {
       });
     }
     
+    // Emit real-time event after successful creation
+    socketEmitter.emitMessageCreated(workspaceId, result.data);
+    
     res.status(result.statusCode || 200).json({
       success: true,
       data: result.data
@@ -91,6 +96,9 @@ export const editMessage = async (req, res, next) => {
       });
     }
     
+    // Emit real-time event after successful update
+    socketEmitter.emitMessageUpdated(result.data.workspaceId.toString(), result.data);
+    
     res.json({
       success: true,
       data: result.data
@@ -120,6 +128,10 @@ export const deleteMessage = async (req, res, next) => {
         message: result.message
       });
     }
+    
+    // Emit real-time event after successful deletion
+    // workspaceId is included in the result for socket emission
+    socketEmitter.emitMessageDeleted(result.workspaceId, messageId);
     
     res.json({
       success: true,

@@ -9,3 +9,4 @@ export { default as workspaceValidator } from './workspaceValidator.js';
 export { default as messageValidator } from './messageValidator.js';
 export { default as commentValidator } from './commentValidator.js';
 export { default as commonValidator } from './commonValidator.js';
+export { default as milestoneValidator } from './milestoneValidator.js';

@@ -3,9 +3,11 @@
  * 
  * Handles HTTP requests for comment operations.
  * Thin layer that delegates to services and formats responses.
+ * Emits real-time events after successful operations.
  */
 
 import commentService from '../services/commentService.js';
+import socketEmitter from '../utils/socketEmitter.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -60,6 +62,9 @@ export const createComment = async (req, res, next) => {
       });
     }
     
+    // Emit real-time event after successful creation
+    socketEmitter.emitCommentCreated(workspaceId, result.data);
+    
     res.status(result.statusCode || 200).json({
       success: true,
       data: result.data
@@ -93,6 +98,10 @@ export const createReply = async (req, res, next) => {
       });
     }
     
+    // Emit real-time event after successful reply creation
+    // workspaceId is included in the result for socket emission
+    socketEmitter.emitCommentCreated(result.workspaceId, result.data);
+    
     res.status(result.statusCode || 200).json({
       success: true,
       data: result.data
@@ -124,6 +133,9 @@ export const editComment = async (req, res, next) => {
       });
     }
     
+    // Emit real-time event after successful update
+    socketEmitter.emitCommentUpdated(result.data.workspaceId.toString(), result.data);
+    
     res.json({
       success: true,
       data: result.data
@@ -153,6 +165,10 @@ export const deleteComment = async (req, res, next) => {
         message: result.message
       });
     }
+    
+    // Emit real-time event after successful deletion
+    // workspaceId is included in the result for socket emission
+    socketEmitter.emitCommentDeleted(result.workspaceId, commentId);
     
     res.json({
       success: true,
