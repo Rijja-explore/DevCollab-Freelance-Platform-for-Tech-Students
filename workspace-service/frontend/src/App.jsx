@@ -1,34 +1,45 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar';
-import Home from './pages/Home';
-import './styles/App.css';
-
 /**
- * Main App Component
- * 
- * Provides routing and layout for the entire application.
- * Routes will be added as features are implemented.
+ * App — root component.
+ *
+ * Provider order (outermost to innermost):
+ *   ToastProvider → AuthProvider → BrowserRouter
+ *
+ * ToastProvider must be outermost because AuthProvider calls `useToast`
+ * internally to show session-expired notifications.
+ *
+ * Routes:
+ *   /                  → Dashboard
+ *   /workspaces        → WorkspaceList
+ *   /workspaces/:id    → WorkspaceDetail
+ *
+ * Requirements: 11.6
  */
 
-function App() {
+import { BrowserRouter } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
+import { ToastProvider } from './contexts/ToastContext';
+import { AuthProvider } from './contexts/AuthContext';
+import Layout from './components/layout/Layout';
+import Toast from './components/common/Toast';
+import Dashboard from './pages/Dashboard';
+import WorkspaceList from './pages/WorkspaceList';
+import WorkspaceDetail from './pages/WorkspaceDetail';
+
+export default function App() {
   return (
-    <Router>
-      <div className="app">
-        <Navbar />
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            {/* Routes for future features:
-              - Workspaces list: /workspaces
-              - Workspace detail: /workspaces/:id
-              - Chat: /workspaces/:id/chat
-              - Threads: /workspaces/:id/threads/:threadId
-            */}
-          </Routes>
-        </main>
-      </div>
-    </Router>
+    <ToastProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Layout>
+            <Routes>
+              <Route path="/"               element={<Dashboard />} />
+              <Route path="/workspaces"     element={<WorkspaceList />} />
+              <Route path="/workspaces/:id" element={<WorkspaceDetail />} />
+            </Routes>
+          </Layout>
+          <Toast />
+        </BrowserRouter>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
-
-export default App;

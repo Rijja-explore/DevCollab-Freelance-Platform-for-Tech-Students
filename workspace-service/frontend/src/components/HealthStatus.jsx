@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getHealthStatus } from '../services/api';
+import { getHealth } from '../services/api';
 import '../styles/HealthStatus.css';
 
 /**
@@ -22,7 +22,7 @@ function HealthStatus() {
     const checkHealth = async () => {
       try {
         setLoading(true);
-        const data = await getHealthStatus();
+        const data = await getHealth();
         setHealth(data);
         setLastChecked(new Date());
         setError(null);

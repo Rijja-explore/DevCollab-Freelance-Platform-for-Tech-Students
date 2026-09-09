@@ -1,0 +1,293 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Set up testing infrastructure and global styles": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970837725
+      },
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970851139
+      },
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788971442847
+      }
+    ],
+    "2.1 Create `src/services/api.js`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970837905
+      },
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788971455147
+      },
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788971666454
+      }
+    ],
+    "3. Implement Socket.IO service": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970838093
+      },
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788971695067
+      },
+      {
+        "executionId": "f0149a30-7845-4efd-bdc7-b78f25b54447",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788972720665
+      }
+    ],
+    "4.1 Create `src/contexts/AuthContext.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970838220
+      }
+    ],
+    "4.4 Create `src/hooks/useAuth.js`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970838384
+      }
+    ],
+    "5.1 Create `src/contexts/ToastContext.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970838519
+      },
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788971699163
+      }
+    ],
+    "5.2 Create `src/components/common/Toast.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970838660
+      }
+    ],
+    "6.1 Create `src/components/common/StatusBadge.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970838791
+      },
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788971703462
+      }
+    ],
+    "6.3 Create `src/components/common/Button.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970838949
+      },
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788971707774
+      }
+    ],
+    "6.4 Create `src/components/common/Card.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970839089
+      },
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788971713038
+      }
+    ],
+    "6.5 Create `src/components/common/Modal.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970839275
+      }
+    ],
+    "6.6 Create `src/components/common/EmptyState.jsx`, `ErrorState.jsx`, `LoadingSkeleton.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970839443
+      }
+    ],
+    "6.7 Create `src/components/common/TokenInput.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970839587
+      }
+    ],
+    "7.1 Create `src/components/layout/Sidebar.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970839720
+      }
+    ],
+    "7.2 Create `src/components/layout/Navbar.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970839849
+      }
+    ],
+    "7.3 Create `src/components/layout/Layout.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970839975
+      }
+    ],
+    "7.4 Rewrite `src/App.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970840101
+      }
+    ],
+    "8. Checkpoint — Verify layout renders": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970840236
+      }
+    ],
+    "9.1 Create `src/components/workspace/WorkspaceHeader.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970840359
+      }
+    ],
+    "9.2 Create `src/components/workspace/WorkspaceNotFound.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970840484
+      }
+    ],
+    "10.1 Create `src/components/messages/MessageBubble.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970840642
+      }
+    ],
+    "10.3 Create `src/components/messages/ChatPanel.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970840767
+      }
+    ],
+    "11.1 Create `src/components/comments/CommentItem.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970840890
+      }
+    ],
+    "11.3 Create `src/components/comments/CommentsPanel.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970841004
+      }
+    ],
+    "12.1 Create `src/components/milestones/MilestoneCard.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970841139
+      }
+    ],
+    "12.2 Create `src/components/milestones/CreateMilestoneModal.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970841256
+      }
+    ],
+    "12.3 Create `src/components/milestones/CompleteMilestoneModal.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970841383
+      }
+    ],
+    "12.4 Create `src/components/milestones/MilestonesPanel.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970841499
+      }
+    ],
+    "13.1 Create `src/pages/Dashboard.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970841640
+      }
+    ],
+    "13.2 Create `src/pages/WorkspaceList.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970841771
+      }
+    ],
+    "13.3 Create `src/pages/WorkspaceDetail.jsx`": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970841904
+      }
+    ],
+    "14. Implement useSocket hook": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970842032
+      }
+    ],
+    "15. Final checkpoint — Full build and test pass": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788970842167
+      }
+    ],
+    "2. Implement API service layer": [
+      {
+        "executionId": "59364ccb-44a3-42b0-ae59-1a556e5d82e4",
+        "chatSessionId": "sess_d1bf5824-c18d-4642-a36a-77bcd189bc5c",
+        "timestamp": 1788971666620
+      }
+    ]
+  }
+}

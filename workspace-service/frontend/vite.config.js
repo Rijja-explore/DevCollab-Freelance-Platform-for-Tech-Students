@@ -8,6 +8,7 @@ import react from '@vitejs/plugin-react';
  * - Uses React plugin for JSX support
  * - Configures CORS proxy for development
  * - Sets up development server on port 3000
+ * - Configures Vitest for unit and property-based testing
  */
 
 export default defineConfig({
@@ -26,5 +27,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/setupTests.js'],
+    globals: true,
   },
 });
