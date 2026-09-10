@@ -1,0 +1,242 @@
+version: '3.8'
+
+services:
+  # ─── SERVICE 1 DATA STORES: DISCOVERY & MATCHING ────────────────────────────
+  postgres-discovery:
+    image: postgres:15-alpine
+    container_name: devcollab-postgres-discovery
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-devcollab_discovery}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_discovery_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d devcollab_discovery"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devcollab-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: devcollab-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - devcollab-network
+
+  # ─── SERVICE 2 DATA STORES: COLLABORATION WORKSPACE ─────────────────────────
+  mongodb:
+    image: mongo:6.0
+    container_name: devcollab-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --eval 'db.adminCommand(\"ping\")'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devcollab-network
+
+  # Shared cache / Workspace Redis pub/sub
+  redis:
+    image: redis:7-alpine
+    container_name: devcollab-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - devcollab-network
+
+  # ─── SERVICE 3 DATA STORE: ESCROW & PAYMENTS ────────────────────────────────
+  mysql-escrow:
+    image: mysql:8.0
+    container_name: devcollab-mysql-escrow
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-escrow_db}
+      MYSQL_USER: ${MYSQL_USER:-escrow_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-escrow_pass}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_escrow_data:/var/lib/mysql
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - devcollab-network
+
+  # ─── EVENT BUS: RABBITMQ ───────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: devcollab-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devcollab-network
+
+  # ─── MICROSERVICE 1: DISCOVERY & MATCHING (Spring Boot + GraphQL) ───────────
+  discovery-service:
+    build:
+      context: ./discovery-service
+      dockerfile: Dockerfile
+    container_name: devcollab-discovery-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-discovery:5432/${POSTGRES_DB:-devcollab_discovery}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres-discovery:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - devcollab-network
+
+  # ─── MICROSERVICE 2: COLLABORATION WORKSPACE (Node.js + Socket.io) ──────────
+  workspace-service:
+    build:
+      context: ./workspace-service/backend
+      dockerfile: Dockerfile
+    container_name: devcollab-workspace-service
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      MONGODB_URI: mongodb://mongodb:27017/devcollab_workspace
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+      ESCROW_SERVICE_URL: http://escrow-service:8080
+      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+      CORS_ORIGIN: "http://localhost:5173,http://localhost:80,http://frontend:80"
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./keys/public.pem:/app/keys/public.pem:ro
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - devcollab-network
+
+  # ─── MICROSERVICE 3: PAYMENT ESCROW & MILESTONES (Spring Boot + PayPal) ─────
+  escrow-service:
+    build:
+      context: ./escrow-service
+      dockerfile: Dockerfile
+    container_name: devcollab-escrow-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-escrow:3306/${MYSQL_DATABASE:-escrow_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-escrow_user}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-escrow_pass}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-sandbox_client_id_placeholder}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-sandbox_client_secret_placeholder}
+      PAYPAL_MODE: ${PAYPAL_MODE:-sandbox}
+      PAYPAL_CURRENCY: ${PAYPAL_CURRENCY:-USD}
+      WORKSPACE_SERVICE_URL: http://workspace-service:5000
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql-escrow:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - devcollab-network
+
+  # ─── UNIFIED FRONTEND (React + Vite + Tailwind + Socket.io + PayPal JS) ─────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+        VITE_DEV_AUTH: "true"
+    container_name: devcollab-frontend
+    ports:
+      - "5173:80"
+      - "80:80"
+    depends_on:
+      - discovery-service
+      - workspace-service
+      - escrow-service
+    networks:
+      - devcollab-network
+
+volumes:
+  postgres_discovery_data:
+  es_data:
+  mongo_data:
+  redis_data:
+  mysql_escrow_data:
+  rabbitmq_data:
+
+networks:
+  devcollab-network:
+    driver: bridge
