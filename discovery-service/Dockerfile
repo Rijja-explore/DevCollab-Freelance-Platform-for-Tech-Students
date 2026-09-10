@@ -6,6 +6,6 @@ RUN mvn -q -DskipTests package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-COPY --from=build /app/target/devcollab-auth-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /app/target/discovery-service-1.0.0.jar app.jar
 EXPOSE 8081
 ENTRYPOINT ["java","-jar","/app/app.jar"]

@@ -1,0 +1,75 @@
+type Project {
+    id: ID!
+    startupId: ID!
+    title: String!
+    description: String!
+    category: String!
+    budget: Float!
+    currency: String!
+    status: String!
+    requiredSkills: [String!]!
+    createdAt: String!
+}
+
+type StudentProfile {
+    id: ID!
+    userId: ID!
+    fullName: String!
+    headline: String
+    bio: String
+    hourlyRate: Float
+    rating: Float!
+    skills: [String!]!
+}
+
+type ProjectRecommendation {
+    project: Project!
+    matchScore: Float!
+    matchingSkills: [String!]!
+}
+
+type MatchResult {
+    matchId: ID!
+    projectId: ID!
+    startupId: ID!
+    studentId: ID!
+    matchScore: Float!
+    status: String!
+    matchedAt: String!
+    message: String!
+}
+
+input CreateProjectInput {
+    startupId: ID
+    title: String!
+    description: String!
+    category: String!
+    budget: Float!
+    currency: String
+    requiredSkills: [String!]!
+}
+
+input CreateStudentProfileInput {
+    userId: ID
+    fullName: String!
+    headline: String
+    bio: String
+    hourlyRate: Float
+    skills: [String!]!
+}
+
+type Query {
+    projects(category: String, status: String, page: Int, size: Int): [Project!]!
+    project(id: ID!): Project
+    searchProjects(keyword: String, skills: [String], category: String): [Project!]!
+    matchRecommendations(studentId: ID!): [ProjectRecommendation!]!
+    studentProfile(id: ID!): StudentProfile
+    allStudentProfiles: [StudentProfile!]!
+}
+
+type Mutation {
+    createProject(input: CreateProjectInput!): Project!
+    updateProjectStatus(id: ID!, status: String!): Project!
+    matchProject(projectId: ID!, studentId: ID!): MatchResult!
+    createStudentProfile(input: CreateStudentProfileInput!): StudentProfile!
+}

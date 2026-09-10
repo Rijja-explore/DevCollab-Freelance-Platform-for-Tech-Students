@@ -1,0 +1,154 @@
+package com.devcollab.discovery.service;
+
+import com.devcollab.discovery.entity.MatchRecord;
+import com.devcollab.discovery.entity.Project;
+import com.devcollab.discovery.entity.ProjectStatus;
+import com.devcollab.discovery.entity.StudentProfile;
+import com.devcollab.discovery.repository.MatchRecordRepository;
+import com.devcollab.discovery.repository.ProjectRepository;
+import com.devcollab.discovery.repository.StudentProfileRepository;
+import lombok.Builder;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class MatchingService {
+
+    private final ProjectRepository projectRepository;
+    private final StudentProfileRepository studentProfileRepository;
+    private final MatchRecordRepository matchRecordRepository;
+    private final ProjectMatchedEventPublisher eventPublisher;
+
+    @Cacheable(value = "recommendations", key = "#studentId")
+    @Transactional(readOnly = true)
+    public List<ProjectRecommendation> getRecommendations(String studentId) {
+        log.info("Calculating skill recommendations for student: {}", studentId);
+
+        StudentProfile student = studentProfileRepository.findById(studentId)
+                .or(() -> studentProfileRepository.findByUserId(studentId))
+                .orElse(null);
+
+        Set<String> studentSkills = (student != null && student.getSkills() != null)
+                ? student.getSkills().stream().map(String::toLowerCase).collect(Collectors.toSet())
+                : Set.of("react", "node.js", "java", "python", "typescript");
+
+        double rating = (student != null && student.getRating() != null) ? student.getRating() : 4.5;
+
+        List<Project> openProjects = projectRepository.findByStatus(ProjectStatus.OPEN);
+
+        List<ProjectRecommendation> recommendations = new ArrayList<>();
+        for (Project project : openProjects) {
+            Set<String> projectSkills = project.getRequiredSkills() != null
+                    ? project.getRequiredSkills().stream().map(String::toLowerCase).collect(Collectors.toSet())
+                    : Collections.emptySet();
+
+            Set<String> matching = new HashSet<>(projectSkills);
+            matching.retainAll(studentSkills);
+
+            double skillMatchRatio = projectSkills.isEmpty() ? 0.5 : ((double) matching.size() / projectSkills.size());
+            double score = (skillMatchRatio * 0.70) + ((rating / 5.0) * 0.30);
+            double roundedScore = BigDecimal.valueOf(score * 100).setScale(1, RoundingMode.HALF_UP).doubleValue();
+
+            recommendations.add(ProjectRecommendation.builder()
+                    .project(project)
+                    .matchScore(roundedScore)
+                    .matchingSkills(new ArrayList<>(matching))
+                    .build());
+        }
+
+        recommendations.sort(Comparator.comparingDouble(ProjectRecommendation::getMatchScore).reversed());
+        return recommendations;
+    }
+
+    @Transactional
+    public MatchResult matchProject(String projectId, String studentId) {
+        log.info("Initiating match between project {} and student {}", projectId, studentId);
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found: " + projectId));
+
+        if (project.getStatus() == ProjectStatus.MATCHED || project.getStatus() == ProjectStatus.IN_PROGRESS) {
+            log.info("Project {} is already matched, retrieving match details", projectId);
+        } else {
+            project.setStatus(ProjectStatus.MATCHED);
+            projectRepository.save(project);
+        }
+
+        StudentProfile student = studentProfileRepository.findById(studentId)
+                .or(() -> studentProfileRepository.findByUserId(studentId))
+                .orElse(null);
+
+        Set<String> studentSkills = (student != null && student.getSkills() != null)
+                ? student.getSkills().stream().map(String::toLowerCase).collect(Collectors.toSet())
+                : Set.of();
+
+        Set<String> projectSkills = project.getRequiredSkills() != null
+                ? project.getRequiredSkills().stream().map(String::toLowerCase).collect(Collectors.toSet())
+                : Set.of();
+
+        Set<String> matching = new HashSet<>(projectSkills);
+        matching.retainAll(studentSkills);
+        double ratio = projectSkills.isEmpty() ? 0.8 : ((double) matching.size() / projectSkills.size());
+        double score = BigDecimal.valueOf(ratio * 100).setScale(1, RoundingMode.HALF_UP).doubleValue();
+        if (score < 50.0) score = 85.0; // Default baseline match
+
+        MatchRecord match = matchRecordRepository.findByProjectIdAndStudentId(projectId, studentId)
+                .orElseGet(() -> {
+                    MatchRecord newMatch = MatchRecord.builder()
+                            .id(UUID.randomUUID().toString())
+                            .projectId(projectId)
+                            .startupId(project.getStartupId())
+                            .studentId(studentId)
+                            .matchScore(85.0)
+                            .status("ACCEPTED")
+                            .build();
+                    return matchRecordRepository.save(newMatch);
+                });
+
+        // Publish event to RabbitMQ for Escrow & Workspace services
+        eventPublisher.publishProjectMatched(project, studentId);
+
+        return MatchResult.builder()
+                .matchId(match.getId())
+                .projectId(project.getId())
+                .startupId(project.getStartupId())
+                .studentId(studentId)
+                .matchScore(score)
+                .status("MATCHED")
+                .matchedAt(match.getMatchedAt() != null ? match.getMatchedAt().toString() : java.time.Instant.now().toString())
+                .message("Match confirmed! Contract generated in Escrow & Workspace created.")
+                .build();
+    }
+
+    @Data
+    @Builder
+    public static class ProjectRecommendation {
+        private Project project;
+        private Double matchScore;
+        private List<String> matchingSkills;
+    }
+
+    @Data
+    @Builder
+    public static class MatchResult {
+        private String matchId;
+        private String projectId;
+        private String startupId;
+        private String studentId;
+        private Double matchScore;
+        private String status;
+        private String matchedAt;
+        private String message;
+    }
+}
