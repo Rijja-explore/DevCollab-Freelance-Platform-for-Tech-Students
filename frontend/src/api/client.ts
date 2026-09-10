@@ -1,7 +1,6 @@
 import axios from 'axios'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
-const DEV_AUTH_ENABLED = import.meta.env.VITE_DEV_AUTH === 'true'
 
 const client = axios.create({
   baseURL: BASE_URL,
@@ -14,10 +13,6 @@ const client = axios.create({
 // ─── Request Interceptor: Inject JWT ────────────────────────────────────────
 client.interceptors.request.use(
   (config) => {
-    if (DEV_AUTH_ENABLED) {
-      return config
-    }
-
     const token = localStorage.getItem('devcollab_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -27,24 +22,71 @@ client.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-// ─── Response Interceptor: Handle 401 ───────────────────────────────────────
+// ─── Response Interceptor ───────────────────────────────────────────────────
 client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('devcollab_token')
-      window.location.href = '/login'
+      console.warn('Unauthorized request, checking token state')
     }
     return Promise.reject(error)
   },
 )
 
-if (DEV_AUTH_ENABLED) {
-  localStorage.removeItem('devcollab_token')
+// ─── Auth API ────────────────────────────────────────────────────────────────
+export const authApi = {
+  getToken: (role = 'STARTUP', userId?: string, email?: string, name?: string) =>
+    client.post('/api/auth/token', { role, userId, email, name }),
+  login: (email: string) =>
+    client.post('/api/auth/login', { email }),
 }
 
-// ─── API Functions ────────────────────────────────────────────────────────────
+// ─── Discovery & Matching Service API ─────────────────────────────────────────
+export const discoveryApi = {
+  getProjects: (category?: string, status?: string, page = 0, size = 20) => {
+    const params = new URLSearchParams({ page: String(page), size: String(size) })
+    if (category) params.append('category', category)
+    if (status) params.append('status', status)
+    return client.get(`/api/projects?${params}`)
+  },
+  getProjectById: (id: string) =>
+    client.get(`/api/projects/${id}`),
+  createProject: (data: unknown) =>
+    client.post('/api/projects', data),
+  search: (q?: string, skills?: string[], category?: string) => {
+    const params = new URLSearchParams()
+    if (q) params.append('q', q)
+    if (skills && skills.length) skills.forEach((s) => params.append('skills', s))
+    if (category) params.append('category', category)
+    return client.get(`/api/projects/search?${params}`)
+  },
+  getRecommendations: (studentId: string) =>
+    client.get(`/api/matches/recommendations/${studentId}`),
+  match: (projectId: string, studentId: string) =>
+    client.post('/api/matches', { projectId, studentId }),
+  getStudentProfiles: () =>
+    client.get('/api/profiles/students'),
+  graphql: (query: string, variables: Record<string, unknown> = {}) =>
+    client.post('/graphql', { query, variables }),
+}
 
+// ─── Collaboration Workspace Service API ───────────────────────────────────────
+export const workspaceApi = {
+  getAll: () =>
+    client.get('/api/workspaces'),
+  getById: (id: string) =>
+    client.get(`/api/workspaces/${id}`),
+  getMessages: (workspaceId: string, limit = 50) =>
+    client.get(`/api/messages/${workspaceId}?limit=${limit}`),
+  sendMessage: (workspaceId: string, content: string, senderId?: string, senderName?: string) =>
+    client.post(`/api/messages/${workspaceId}`, { content, senderId, senderName }),
+  getComments: (workspaceId: string) =>
+    client.get(`/api/comments/${workspaceId}`),
+  addComment: (workspaceId: string, content: string, lineNumber?: number, fileSnippet?: string) =>
+    client.post(`/api/comments/${workspaceId}`, { content, lineNumber, fileSnippet }),
+}
+
+// ─── Escrow & Milestone Service API ───────────────────────────────────────────
 export const contractsApi = {
   getAll: (page = 0, size = 20) =>
     client.get(`/api/contracts?page=${page}&size=${size}`),

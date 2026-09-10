@@ -24,14 +24,9 @@ interface CheckoutModalProps {
 }
 
 /**
- * PayPal / Demo checkout modal.
- *
- * Only renders PayPalButtons when a client id is configured and the
- * PayPalScriptProvider is mounted (App.tsx). Otherwise renders a mock
- * "Simulate Payment" button for offline demos.
+ * PayPal / Escrow checkout modal.
  */
 const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onCapture }) => {
-  // usePayPalScriptReducer is only valid when PayPalScriptProvider is mounted.
   const scriptState = isPayPalConfigured
     ? usePayPalScriptReducer()
     : null;
@@ -50,27 +45,45 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onCapture
           <X className="w-5 h-5" />
         </button>
 
-        <h3 className="text-lg font-bold text-white">Complete Payment</h3>
+        <h3 className="text-lg font-bold text-white">Complete PayPal Escrow Payment</h3>
         <p className="text-sm text-slate-400 mt-1">
-          {order.title} · ₹{order.amount.toLocaleString('en-IN')}
+          {order.title} · ${Number(order.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
         </p>
 
-        <div className="mt-6">
+        <div className="mt-6 space-y-4">
+          {order.approveUrl && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-200">
+              <p className="font-semibold mb-1">PayPal Sandbox Authorization Ready</p>
+              <p className="text-slate-400 mb-2">
+                Authorize this escrow milestone directly in PayPal Sandbox checkout:
+              </p>
+              <a
+                href={order.approveUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#ffc439] hover:bg-[#f4b628] text-slate-900 font-bold rounded text-xs transition"
+              >
+                Proceed to PayPal Checkout
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          )}
+
           {isPayPalConfigured ? (
             <div className="min-h-[140px]">
               {isRejected && (
                 <p className="text-sm text-rose-400 mb-3">
-                  PayPal SDK failed to load. You may be offline.
+                  PayPal SDK failed to load. Check your network or client ID.
                 </p>
               )}
               {isPending && (
-                <p className="text-sm text-slate-400 mb-3">Loading PayPal...</p>
+                <p className="text-sm text-slate-400 mb-3">Loading PayPal Buttons...</p>
               )}
               <PayPalButtons
                 forceReRender={[order.orderId]}
                 createOrder={() => order.orderId}
                 onApprove={async () => {
-                  toast.success('Payment approved. Capturing...');
+                  toast.success('Payment approved by PayPal. Capturing escrow...');
                   await onCapture(order.transactionId);
                 }}
                 onCancel={() => {
@@ -78,25 +91,29 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onCapture
                   onClose();
                 }}
                 onError={() => {
-                  toast.error('PayPal checkout errored.');
-                  onClose();
+                  toast.error('PayPal checkout encountered an issue.');
                 }}
               />
             </div>
           ) : (
-            <div className="text-center">
-              <p className="text-sm text-slate-400 mb-4">
-                Running in <strong className="text-white">demo/mock</strong> mode. No PayPal client is
-                configured, so checkout is simulated.
+            <div className="text-center p-3 bg-white/5 rounded-lg">
+              <p className="text-xs text-slate-400 mb-3">
+                No PayPal Client ID set in frontend .env. You can capture directly in sandbox demo mode:
               </p>
-              <button
-                onClick={() => onCapture(order.transactionId)}
-                className="btn-primary w-full"
-              >
-                Simulate Payment Capture
-              </button>
             </div>
           )}
+
+          <div className="pt-2 border-t border-white/10">
+            <button
+              onClick={() => onCapture(order.transactionId)}
+              className="btn-primary w-full text-xs py-2 bg-emerald-600 hover:bg-emerald-500"
+            >
+              Verify & Complete Escrow Capture
+            </button>
+            <p className="text-[11px] text-slate-500 text-center mt-1.5">
+              Syncs capture with the PayPal Escrow Service and unlocks workspace milestones.
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -157,8 +174,6 @@ export const Milestones: React.FC = () => {
       const milestoneRes = await releaseMilestone(milestoneId);
       const milestoneData = milestoneRes?.data ?? milestoneRes;
 
-      // The backend returns the milestone; the order id lives on the transaction.
-      // Fetch the latest transaction for this milestone to get providerOrderId.
       let orderId = milestoneData?.providerOrderId;
       let transactionId = milestoneData?.transactionId;
       if (!orderId || !transactionId) {
@@ -177,6 +192,8 @@ export const Milestones: React.FC = () => {
         throw new Error('Payment order was created but its transaction could not be retrieved');
       }
 
+      const approveUrl = milestoneData?.approveUrl || milestoneData?.data?.approveUrl;
+
       toast.success('Payment order created. Opening checkout...');
       setPaypalOrder({
         orderId,
@@ -184,6 +201,7 @@ export const Milestones: React.FC = () => {
         milestoneId,
         amount,
         title: contractTitle,
+        approveUrl,
       });
     } catch (err: any) {
       console.error(err);
@@ -270,7 +288,7 @@ export const Milestones: React.FC = () => {
                       </Link>
                     </td>
                     <td className="table-cell text-white font-medium">
-                      ₹{milestone.amount.toLocaleString('en-IN')}
+                      ${Number(milestone.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
                     </td>
                     <td className="table-cell">
                       <StatusBadge status={milestone.status} />
@@ -346,7 +364,7 @@ export const Milestones: React.FC = () => {
         </div>
       )}
 
-      {/* PayPal / Demo Checkout Modal */}
+      {/* PayPal / Escrow Checkout Modal */}
       {paypalOrder && (
         <CheckoutModal
           order={paypalOrder}
@@ -357,4 +375,3 @@ export const Milestones: React.FC = () => {
     </div>
   );
 };
-

@@ -65,8 +65,8 @@ export const PaymentDetails: React.FC = () => {
               Total Amount
             </span>
             <div className="text-4xl font-extrabold text-white mt-1">
-              ₹{tx.amount.toLocaleString('en-IN')}{' '}
-              <span className="text-sm font-semibold text-slate-400">{tx.currency}</span>
+              ${Number(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
+              <span className="text-sm font-semibold text-slate-400">{tx.currency || 'USD'}</span>
             </div>
             {tx.completedAt && (
               <span className="text-xs text-slate-500 mt-2 block">

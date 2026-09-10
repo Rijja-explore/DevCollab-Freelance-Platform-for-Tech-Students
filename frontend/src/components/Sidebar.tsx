@@ -1,57 +1,79 @@
-import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import React from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
+  Compass,
+  Sparkles,
+  Code2,
+  FolderGit2,
   FileText,
   Milestone,
   ShieldCheck,
   CreditCard,
   X,
-  Sparkles,
-} from 'lucide-react';
+} from 'lucide-react'
 
 interface SidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen: boolean
+  onClose: () => void
 }
 
-const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview' },
-  { to: '/contracts', label: 'Contracts', icon: FileText, desc: 'Escrow deals' },
-  { to: '/milestones', label: 'Milestones', icon: Milestone, desc: 'Work phases' },
-  { to: '/transactions', label: 'Transactions', icon: CreditCard, desc: 'Payments' },
-  { to: '/audit-logs', label: 'Audit Logs', icon: ShieldCheck, desc: 'Event trail' },
-];
+const navSections = [
+  {
+    title: 'Platform Overview',
+    items: [
+      { to: '/', label: 'Dashboard', icon: LayoutDashboard, desc: 'Ecosystem overview' },
+    ],
+  },
+  {
+    title: 'Discovery & Matching',
+    items: [
+      { to: '/projects', label: 'Projects Catalog', icon: Compass, desc: 'Search & browse' },
+      { to: '/recommendations', label: 'Match Engine', icon: Sparkles, desc: 'Skill recommendations' },
+      { to: '/graphql-explorer', label: 'GraphQL Explorer', icon: Code2, desc: 'Direct /graphql API' },
+    ],
+  },
+  {
+    title: 'Collaboration',
+    items: [
+      { to: '/workspaces', label: 'Workspaces', icon: FolderGit2, desc: 'Chat & Code reviews' },
+    ],
+  },
+  {
+    title: 'Escrow & Payments',
+    items: [
+      { to: '/contracts', label: 'Contracts', icon: FileText, desc: 'Escrow agreements' },
+      { to: '/milestones', label: 'Milestones & PayPal', icon: Milestone, desc: 'Approvals & Checkout' },
+      { to: '/transactions', label: 'Transactions Ledger', icon: CreditCard, desc: 'Settlement logs' },
+      { to: '/audit-logs', label: 'Security Audit', icon: ShieldCheck, desc: 'Traceability trail' },
+    ],
+  },
+]
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const location = useLocation();
+  const location = useLocation()
 
   return (
     <aside
       className={`
         fixed lg:static inset-y-0 left-0 z-40
         w-72 flex flex-col h-screen flex-shrink-0
-        bg-surface-raised/80 backdrop-blur-2xl
-        border-r border-surface-border
+        bg-slate-950/90 backdrop-blur-2xl
+        border-r border-white/10
         transform transition-transform duration-300 ease-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}
     >
-      {/* Logo */}
-      <div className="p-6 flex items-center justify-between">
+      {/* Brand Header */}
+      <div className="p-6 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-xl bg-vault-gradient flex items-center justify-center shadow-glow-teal">
-              <Sparkles className="w-5 h-5 text-surface" />
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-vault-teal rounded-full border-2 border-surface-raised animate-pulse-slow" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-brand-500/25">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="font-display font-bold text-white text-lg leading-tight tracking-tight">
-              DevCollab
-            </h1>
-            <span className="text-[10px] text-vault-teal font-semibold tracking-[0.2em] uppercase">
-              Vault · Escrow
+            <h1 className="font-bold text-white text-lg tracking-tight">DevCollab</h1>
+            <span className="text-[10px] text-brand-400 font-semibold tracking-widest uppercase">
+              Microservices Platform
             </span>
           </div>
         </div>
@@ -65,79 +87,63 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         </button>
       </div>
 
-      {/* Tagline strip */}
-      <div className="mx-4 mb-4 px-3 py-2 rounded-xl bg-hero-gradient border border-vault-teal/10">
-        <p className="text-[11px] text-slate-400 leading-relaxed">
-          Secure payments between <span className="text-vault-teal font-medium">startups</span> &{' '}
-          <span className="text-accent-coral font-medium">student devs</span>
-        </p>
-      </div>
+      {/* Navigation Links */}
+      <nav className="flex-1 px-4 py-4 space-y-6 overflow-y-auto">
+        {navSections.map((section, sIdx) => (
+          <div key={sIdx} className="space-y-1.5">
+            <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              {section.title}
+            </p>
+            {section.items.map((item) => {
+              const isActive =
+                item.to === '/'
+                  ? location.pathname === '/'
+                  : location.pathname.startsWith(item.to)
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-        <p className="px-3 mb-2 text-[10px] font-semibold text-slate-600 uppercase tracking-widest">
-          Navigation
-        </p>
-        {navItems.map((item) => {
-          const isActive =
-            item.to === '/'
-              ? location.pathname === '/'
-              : location.pathname.startsWith(item.to);
+              const Icon = item.icon
 
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={onClose}
-              className={`group flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                isActive ? 'nav-pill-active' : 'text-slate-400 hover:bg-white/[0.04] hover:text-white'
-              }`}
-            >
-              <span
-                className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 ${
-                  isActive
-                    ? 'bg-vault-teal/20 text-vault-teal shadow-glow-teal'
-                    : 'bg-white/[0.03] text-slate-500 group-hover:text-vault-teal group-hover:bg-vault-teal/10'
-                }`}
-              >
-                <item.icon className="w-[18px] h-[18px]" />
-              </span>
-              <div className="flex-1 min-w-0">
-                <span className="block truncate">{item.label}</span>
-                <span className="block text-[10px] text-slate-600 group-hover:text-slate-500 truncate">
-                  {item.desc}
-                </span>
-              </div>
-              {isActive && (
-                <span className="w-1.5 h-1.5 rounded-full bg-vault-teal shadow-glow-teal flex-shrink-0" />
-              )}
-            </NavLink>
-          );
-        })}
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={onClose}
+                  className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                    isActive
+                      ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Icon
+                    className={`w-4 h-4 transition-colors ${
+                      isActive ? 'text-white' : 'text-slate-500 group-hover:text-brand-400'
+                    }`}
+                  />
+                  <div>
+                    <div className="leading-tight">{item.label}</div>
+                    <div
+                      className={`text-[10px] font-normal transition-colors ${
+                        isActive ? 'text-brand-100' : 'text-slate-500'
+                      }`}
+                    >
+                      {item.desc}
+                    </div>
+                  </div>
+                </NavLink>
+              )
+            })}
+          </div>
+        ))}
       </nav>
 
-      {/* User profile */}
-      <div className="p-4 m-3 rounded-2xl bg-white/[0.03] border border-surface-border">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-xl bg-vault-gradient flex items-center justify-center font-display font-bold text-surface text-sm">
-              DC
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-surface-raised" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate">Platform Admin</p>
-            <p className="text-[11px] text-slate-500 truncate">Escrow Operations</p>
-          </div>
+      {/* Footer Info */}
+      <div className="p-4 m-4 rounded-xl bg-white/5 border border-white/5 text-center">
+        <div className="text-[11px] font-semibold text-slate-300">
+          DevCollab Cloud-Native
         </div>
-        <div className="mt-3 flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-vault-teal/10 text-vault-teal text-[10px] font-semibold uppercase tracking-wide">
-            <span className="w-1 h-1 rounded-full bg-vault-teal animate-pulse" />
-            Live
-          </span>
-          <span className="text-[10px] text-slate-600">PayPal connected</span>
+        <div className="text-[10px] text-slate-500 mt-0.5">
+          REST · GraphQL · WebSocket · PayPal
         </div>
       </div>
     </aside>
-  );
-};
+  )
+}

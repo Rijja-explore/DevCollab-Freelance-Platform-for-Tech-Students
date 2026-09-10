@@ -4,6 +4,10 @@ import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { Layout } from './components/Layout';
 import { ToastProvider } from './components/ToastProvider';
 import { Dashboard } from './pages/Dashboard';
+import { Projects } from './pages/Projects';
+import { Recommendations } from './pages/Recommendations';
+import { Workspaces } from './pages/Workspaces';
+import { GraphQLPlayground } from './pages/GraphQLPlayground';
 import { Contracts } from './pages/Contracts';
 import { Milestones } from './pages/Milestones';
 import { Transactions } from './pages/Transactions';
@@ -18,6 +22,10 @@ const App: React.FC = () => {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/recommendations" element={<Recommendations />} />
+          <Route path="/workspaces" element={<Workspaces />} />
+          <Route path="/graphql-explorer" element={<GraphQLPlayground />} />
           <Route path="/contracts" element={<Contracts />} />
           <Route path="/milestones" element={<Milestones />} />
           <Route path="/transactions" element={<Transactions />} />

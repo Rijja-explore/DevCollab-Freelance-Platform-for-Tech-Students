@@ -73,6 +73,7 @@ export const Contracts: React.FC = () => {
       title,
       description,
       totalAmount: parseFloat(totalAmount),
+      currency: 'USD',
       terms,
       milestones: [], // default milestones added dynamically, or empty initially
     });
@@ -152,7 +153,7 @@ export const Contracts: React.FC = () => {
                       {contract.projectId.slice(0, 8)}...
                     </td>
                     <td className="table-cell text-white font-medium">
-                      ₹{contract.totalAmount.toLocaleString('en-IN')}
+                      ${contract.totalAmount.toLocaleString()} {contract.currency || 'USD'}
                     </td>
                     <td className="table-cell">
                       <StatusBadge status={contract.status} />
@@ -242,7 +243,7 @@ export const Contracts: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="label">Total Contract Amount (INR)</label>
+                  <label className="label">Total Contract Amount (USD)</label>
                   <input
                     type="number"
                     required

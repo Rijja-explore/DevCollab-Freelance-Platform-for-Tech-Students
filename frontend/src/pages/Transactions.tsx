@@ -88,7 +88,7 @@ export const Transactions: React.FC = () => {
                       )}
                     </td>
                     <td className="table-cell text-white font-medium">
-                      ₹{tx.amount.toLocaleString('en-IN')}
+                      ${Number(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
                     </td>
                     <td className="table-cell">
                       <StatusBadge status={tx.status} />

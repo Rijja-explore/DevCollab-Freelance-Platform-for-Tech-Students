@@ -148,7 +148,7 @@ export const Dashboard: React.FC = () => {
         <StatCard
           title="Total Contracts"
           value={stats.totalContracts}
-          description="Matched from Service A"
+          description="Matched via Discovery Service"
           icon={FileText}
           loading={loading}
           accent="teal"
@@ -166,7 +166,7 @@ export const Dashboard: React.FC = () => {
         <StatCard
           title="Released Payments"
           value={stats.releasedPayments}
-          description="Via payment gateway"
+          description="Via PayPal Sandbox"
           icon={CheckCircle}
           loading={loading}
           accent="violet"
@@ -174,8 +174,8 @@ export const Dashboard: React.FC = () => {
         />
         <StatCard
           title="Total Volume"
-          value={`₹${stats.totalRevenue.toLocaleString('en-IN')}`}
-          description="Escrowed INR"
+          value={`$${stats.totalRevenue.toLocaleString('en-US')}`}
+          description="Escrowed USD"
           icon={TrendingUp}
           loading={loading}
           accent="coral"
@@ -189,7 +189,7 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-start justify-between mb-6">
             <div>
               <h3 className="font-display font-semibold text-white text-lg">Payment Volume</h3>
-              <p className="text-xs text-slate-500 mt-1">Monthly escrow releases (INR)</p>
+              <p className="text-xs text-slate-500 mt-1">Monthly escrow releases (USD)</p>
             </div>
             <span className="text-xs font-semibold text-vault-teal bg-vault-teal/10 px-2.5 py-1 rounded-lg">
               Last 6 months
