@@ -1,0 +1,3 @@
+// Middleware functions handle cross-cutting concerns
+// Examples: authentication, logging, error handling, request validation
+// Middleware should be reusable and focused on a single responsibility

@@ -1,0 +1,3 @@
+// Utility functions and helpers
+// Examples: validators, formatters, error handlers, common functions
+// Utils should be stateless and reusable across the application

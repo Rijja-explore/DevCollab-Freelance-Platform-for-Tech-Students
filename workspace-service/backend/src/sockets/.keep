@@ -1,0 +1,3 @@
+// Socket handlers manage real-time WebSocket connections
+// Examples: chat events, typing indicators, online presence, notifications
+// Socket handlers will use services for business logic (not implemented yet)

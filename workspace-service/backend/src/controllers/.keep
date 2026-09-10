@@ -1,0 +1,3 @@
+// Controllers handle HTTP request/response logic
+// They are thin wrappers that call services and return responses
+// Do not put business logic here - delegate to services

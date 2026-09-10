@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Testing
+/coverage
+/.nyc_output
+
+# Production
+/build
+/dist
+
+# Misc
+.DS_Store
+.env.local
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+*.c9/
+*.iml
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Logs
+logs/
+*.log
+
+# Authentication Keys (DO NOT COMMIT)
+# Private key is for development/testing only
+# Public key can be committed for local dev
+backend/keys/private.pem

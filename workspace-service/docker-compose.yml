@@ -1,0 +1,121 @@
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: workspace-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DB: workspace-service
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - workspace-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: workspace-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - workspace-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ Message Broker (Phase 8)
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: workspace-rabbitmq
+    ports:
+      - "5672:5672"    # AMQP protocol port
+      - "15672:15672"  # Management UI  →  http://localhost:15672  (guest / guest)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - workspace-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Backend Service (Development Mode)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile  # Uses development Dockerfile with all dependencies
+    container_name: workspace-backend
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      MONGO_URI: mongodb://root:password@mongodb:27017/workspace-service?authSource=admin
+      REDIS_URL: redis://redis:6379
+      JWT_PUBLIC_KEY_PATH: keys/public.pem
+      JWT_ALGORITHM: RS256
+      # RabbitMQ — individual vars used by src/messaging/rabbitmq.js
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_EXCHANGE: devcollab.events
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules  # Anonymous volume to preserve container's node_modules
+    networks:
+      - workspace-network
+    command: npm run dev  # Uses nodemon for hot reloading
+
+  # Frontend Service (Development Mode)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile  # Uses development Dockerfile with all dependencies
+    container_name: workspace-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:5000  # Use localhost for browser access (not container name)
+      VITE_SOCKET_URL: http://localhost:5000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # Anonymous volume to preserve container's node_modules
+    networks:
+      - workspace-network
+    command: npm run dev  # Uses Vite dev server with hot reloading
+
+volumes:
+  mongodb_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  workspace-network:
+    driver: bridge

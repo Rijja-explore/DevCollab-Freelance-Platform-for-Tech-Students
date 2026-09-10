@@ -1,0 +1,205 @@
+/* ============================================================
+   Google Fonts
+   DM Sans  — body text
+   Syne     — headings
+   JetBrains Mono — IDs, code values, timestamps
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Syne:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ============================================================
+   CSS Custom Properties
+   ============================================================ */
+:root {
+  /* Brand colours */
+  --color-teal:   #06d6a0;
+  --color-coral:  #ff6b6b;
+  --color-violet: #a855f7;
+  --color-amber:  #fbbf24;
+  --color-muted:  #6b7280;
+
+  /* Backgrounds */
+  --bg-primary:   #0a0e1a;
+  --bg-secondary: #0d1117;
+
+  /* Fonts */
+  --font-body:    'DM Sans', system-ui, sans-serif;
+  --font-heading: 'Syne', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Spacing */
+  --radius-sm:    8px;
+  --radius-md:    12px;
+  --radius-lg:    16px;
+
+  /* Glass surface */
+  --glass-bg:     rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================================
+   Base Reset
+   ============================================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: #e2e8f0;
+  font-family: var(--font-body);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+/* IDs, code values, timestamps */
+code,
+.mono,
+[data-mono] {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+a {
+  color: var(--color-teal);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img, svg {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input, textarea, select {
+  font-family: inherit;
+}
+
+/* ============================================================
+   Glassmorphism Card Utility
+   ============================================================ */
+.glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+}
+
+/* ============================================================
+   Mesh Background — Animated Orbs
+   ============================================================ */
+@keyframes meshDrift {
+  0%   { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(40px, -30px) scale(1.05); }
+  50%  { transform: translate(-20px, 50px) scale(0.95); }
+  75%  { transform: translate(30px, 20px) scale(1.08); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+.mesh-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mesh-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  animation: meshDrift 18s ease-in-out infinite;
+}
+
+.mesh-orb--teal {
+  width: 520px;
+  height: 520px;
+  background: radial-gradient(circle, var(--color-teal), transparent 70%);
+  top: -160px;
+  left: -160px;
+  animation-duration: 20s;
+}
+
+.mesh-orb--violet {
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, var(--color-violet), transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation-duration: 24s;
+  animation-delay: -6s;
+}
+
+.mesh-orb--coral {
+  width: 440px;
+  height: 440px;
+  background: radial-gradient(circle, var(--color-coral), transparent 70%);
+  bottom: -120px;
+  right: -120px;
+  animation-duration: 22s;
+  animation-delay: -12s;
+}
+
+/* ============================================================
+   Dot-Grid Overlay
+   ============================================================ */
+.dot-grid-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.06) 1px,
+    transparent 1px
+  );
+  background-size: 28px 28px;
+}
+
+/* ============================================================
+   Shimmer Keyframe — LoadingSkeleton
+   ============================================================ */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+.skeleton {
+  display: block;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  background-size: 1200px 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}

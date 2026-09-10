@@ -1,0 +1,3 @@
+// Routes define API endpoints and map them to controllers
+// Each route file should handle a specific resource (e.g., workspaces, messages)
+// Routes should be thin - minimal logic, mostly delegation to controllers

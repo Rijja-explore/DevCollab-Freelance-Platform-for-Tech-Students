@@ -1,0 +1,120 @@
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: workspace-mongodb-prod
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DB: workspace-service
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - workspace-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: workspace-redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - workspace-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # RabbitMQ Message Broker (Phase 8)
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: workspace-rabbitmq-prod
+    ports:
+      - "5672:5672"    # AMQP protocol port
+      - "15672:15672"  # Management UI (restrict access in production)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - workspace-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # Backend Service (Production Mode)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod  # Uses production Dockerfile with optimized build
+    container_name: workspace-backend-prod
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGO_URI: mongodb://root:password@mongodb:27017/workspace-service?authSource=admin
+      REDIS_URL: redis://redis:6379
+      JWT_PUBLIC_KEY_PATH: keys/public.pem
+      JWT_ALGORITHM: RS256
+      # RabbitMQ — individual vars used by src/messaging/rabbitmq.js
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_EXCHANGE: devcollab.events
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - workspace-network
+    restart: unless-stopped
+    # No volumes in production - code is baked into the image
+
+  # Frontend Service (Production Mode)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod  # Uses production Dockerfile with built static files
+    container_name: workspace-frontend-prod
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:5000  # Configure for your production domain
+      VITE_SOCKET_URL: http://localhost:5000
+    depends_on:
+      - backend
+    networks:
+      - workspace-network
+    restart: unless-stopped
+    # No volumes in production - built files are baked into the image
+
+volumes:
+  mongodb_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  workspace-network:
+    driver: bridge
