@@ -263,8 +263,26 @@ public class MilestoneService {
                     .reason(result.getFailureReason())
                     .build());
         }
-
-        return milestoneMapper.toResponse(milestone);
+        MilestoneResponse response = milestoneMapper.toResponse(milestone);
+        return MilestoneResponse.builder()
+                .id(response.getId())
+                .contractId(response.getContractId())
+                .title(response.getTitle())
+                .description(response.getDescription())
+                .amount(response.getAmount())
+                .sequenceOrder(response.getSequenceOrder())
+                .status(response.getStatus())
+                .dueDate(response.getDueDate())
+                .approvedBy(response.getApprovedBy())
+                .approvedAt(response.getApprovedAt())
+                .releasedAt(response.getReleasedAt())
+                .idempotencyKey(response.getIdempotencyKey())
+                .transactionId(transaction.getId())
+                .providerOrderId(result.isSuccess() ? result.getOrderId() : null)
+                .approveUrl(result.isSuccess() ? result.getApproveUrl() : null)
+                .createdAt(response.getCreatedAt())
+                .updatedAt(response.getUpdatedAt())
+                .build();
     }
 
     /**

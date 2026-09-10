@@ -34,7 +34,7 @@ public class CreateContractRequest {
     private BigDecimal totalAmount;
 
     @Pattern(regexp = "^[A-Z]{3}$", message = "currency must be a valid 3-letter ISO code")
-    private String currency = "INR";
+    private String currency = "USD";
 
     @Size(max = 10000, message = "terms must not exceed 10000 characters")
     private String terms;

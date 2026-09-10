@@ -1,11 +1,13 @@
-FROM eclipse-temurin:21-jre-alpine
-
+FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn -q -DskipTests package
 
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
 RUN addgroup -S escrow && adduser -S escrow -G escrow
-
-COPY target/escrow-service-1.0.0.jar app.jar
-
+COPY --from=build /app/target/escrow-service-1.0.0.jar app.jar
 RUN chown escrow:escrow app.jar
 USER escrow
 
@@ -20,7 +22,5 @@ EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD wget -qO- http://localhost:8080/actuator/health | grep -q '"status":"UP"' || exit 1
-
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE:-docker} -jar app.jar"]
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE:-docker} -jar app.jar"]

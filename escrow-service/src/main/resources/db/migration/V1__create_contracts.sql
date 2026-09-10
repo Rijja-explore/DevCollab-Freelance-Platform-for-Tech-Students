@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS contracts (
     description  TEXT,
     total_amount DECIMAL(19, 4) NOT NULL,
     status       VARCHAR(20)    NOT NULL DEFAULT 'PENDING',
-    currency     VARCHAR(3)     NOT NULL DEFAULT 'INR',
+    currency     VARCHAR(3)     NOT NULL DEFAULT 'USD',
     terms        TEXT,
     created_at   DATETIME(6)    NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at   DATETIME(6)    NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),

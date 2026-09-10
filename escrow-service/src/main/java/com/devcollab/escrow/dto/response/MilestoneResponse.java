@@ -27,6 +27,9 @@ public class MilestoneResponse {
     private Instant approvedAt;
     private Instant releasedAt;
     private String idempotencyKey;
+    private UUID transactionId;
+    private String providerOrderId;
+    private String approveUrl;
     private Instant createdAt;
     private Instant updatedAt;
 }
