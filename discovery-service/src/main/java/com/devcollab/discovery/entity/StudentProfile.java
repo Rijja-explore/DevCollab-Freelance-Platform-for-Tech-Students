@@ -39,7 +39,7 @@ public class StudentProfile {
     @Builder.Default
     private BigDecimal hourlyRate = BigDecimal.valueOf(35.00);
 
-    @Column(name = "rating", precision = 3, scale = 2)
+    @Column(name = "rating")
     @Builder.Default
     private Double rating = 4.8;
 

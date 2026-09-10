@@ -89,6 +89,7 @@ services:
       --default-authentication-plugin=mysql_native_password
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
+      --log-bin-trust-function-creators=1
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
       interval: 10s
@@ -160,16 +161,21 @@ services:
       PORT: 5000
       NODE_ENV: production
       MONGODB_URI: mongodb://mongodb:27017/devcollab_workspace
+      MONGO_URI: mongodb://mongodb:27017/devcollab_workspace
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_EXCHANGE: devcollab.events
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
       ESCROW_SERVICE_URL: http://escrow-service:8080
-      JWT_PUBLIC_KEY_PATH: /app/keys/public.pem
+      JWT_PUBLIC_KEY_PATH: keys/public.pem
       CORS_ORIGIN: "http://localhost:5173,http://localhost:80,http://frontend:80"
     ports:
       - "5000:5000"
-    volumes:
-      - ./keys/public.pem:/app/keys/public.pem:ro
     depends_on:
       mongodb:
         condition: service_healthy
@@ -195,6 +201,10 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "false"
+      SPRING_FLYWAY_REPAIR: "true"
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-paypal}
       PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-sandbox_client_id_placeholder}
       PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-sandbox_client_secret_placeholder}
       PAYPAL_MODE: ${PAYPAL_MODE:-sandbox}

@@ -60,8 +60,8 @@ public class ContractController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN')")
-    @Operation(summary = "List all contracts (admin only)")
+    @PreAuthorize("hasAnyRole('STARTUP', 'STUDENT', 'ADMIN')")
+    @Operation(summary = "List all contracts")
     public ResponseEntity<ApiResponse<PageResponse<ContractResponse>>> getAllContracts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {

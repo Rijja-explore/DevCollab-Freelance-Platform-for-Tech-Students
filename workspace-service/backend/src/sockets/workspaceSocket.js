@@ -27,21 +27,14 @@ import mongoose from 'mongoose';
 export const handleWorkspaceSocket = (socket) => {
   /**
    * Join workspace room
-   * Client emits: { workspaceId: string }
+   * Client emits: { workspaceId: string } or 'workspaceId'
    */
   socket.on('join-workspace', async (data) => {
     try {
-      const { workspaceId } = data;
+      const workspaceId = typeof data === 'string' ? data : data?.workspaceId;
 
-      // Validate workspaceId
       if (!workspaceId) {
         socket.emit('error', { message: 'Workspace ID is required' });
-        return;
-      }
-
-      // Validate MongoDB ObjectId format
-      if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
-        socket.emit('error', { message: 'Invalid workspace ID format' });
         return;
       }
 
@@ -51,7 +44,8 @@ export const handleWorkspaceSocket = (socket) => {
       // Join the room
       socket.join(room);
 
-      logger.info(`User ${socket.user.id} joined workspace room: ${room} (socket: ${socket.id})`);
+      const userId = socket.user?.id || 'anonymous';
+      logger.info(`User ${userId} joined workspace room: ${room} (socket: ${socket.id})`);
 
       // Acknowledge successful join
       socket.emit('joined-workspace', {
@@ -66,28 +60,55 @@ export const handleWorkspaceSocket = (socket) => {
   });
 
   /**
+   * Real-time client-to-room message broadcast
+   */
+  socket.on('send-message', (msgPayload) => {
+    try {
+      const workspaceId = msgPayload?.workspaceId;
+      if (workspaceId) {
+        const room = socketEmitter.getWorkspaceRoom(workspaceId);
+        socket.to(room).emit('new-message', msgPayload);
+        socket.to(room).emit('message-created', msgPayload);
+      }
+    } catch (error) {
+      logger.error(`Error broadcasting socket message: ${error.message}`);
+    }
+  });
+
+  /**
+   * Real-time client-to-room code comment broadcast
+   */
+  socket.on('send-comment', (cmtPayload) => {
+    try {
+      const workspaceId = cmtPayload?.workspaceId;
+      if (workspaceId) {
+        const room = socketEmitter.getWorkspaceRoom(workspaceId);
+        socket.to(room).emit('new-comment', cmtPayload);
+        socket.to(room).emit('comment-created', cmtPayload);
+      }
+    } catch (error) {
+      logger.error(`Error broadcasting socket comment: ${error.message}`);
+    }
+  });
+
+  /**
    * Leave workspace room
-   * Client emits: { workspaceId: string }
    */
   socket.on('leave-workspace', async (data) => {
     try {
-      const { workspaceId } = data;
+      const workspaceId = typeof data === 'string' ? data : data?.workspaceId;
 
-      // Validate workspaceId
       if (!workspaceId) {
         socket.emit('error', { message: 'Workspace ID is required' });
         return;
       }
 
-      // Get room name
       const room = socketEmitter.getWorkspaceRoom(workspaceId);
-
-      // Leave the room
       socket.leave(room);
 
-      logger.info(`User ${socket.user.id} left workspace room: ${room} (socket: ${socket.id})`);
+      const userId = socket.user?.id || 'anonymous';
+      logger.info(`User ${userId} left workspace room: ${room} (socket: ${socket.id})`);
 
-      // Acknowledge successful leave
       socket.emit('left-workspace', {
         workspaceId,
         room,

@@ -1,367 +1,320 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react'
 import {
-  FileText,
-  Clock,
+  FolderGit2,
   CheckCircle,
-  TrendingUp,
+  DollarSign,
   ArrowRight,
   ShieldCheck,
   Zap,
-  ArrowUpRight,
   Activity,
-  Radio,
-} from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts';
-import { StatCard } from '../components/StatCard';
-import { contractsApi, transactionsApi, auditApi } from '../api/client';
-import { format } from 'date-fns';
-import { Link } from 'react-router-dom';
-
-const chartTooltipStyle = {
-  backgroundColor: '#0c1019',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: '12px',
-  color: '#f1f5f9',
-  fontSize: '12px',
-};
+  Compass,
+  FileText,
+  Search,
+  Handshake,
+  Users,
+} from 'lucide-react'
+import { StatCard } from '../components/StatCard'
+import { discoveryApi, workspaceApi, contractsApi, transactionsApi, auditApi } from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
+import { Link } from 'react-router-dom'
+import { format } from 'date-fns'
 
 export const Dashboard: React.FC = () => {
+  const { user, role } = useAuth()
   const [stats, setStats] = useState({
+    totalProjects: 0,
+    activeWorkspaces: 0,
     totalContracts: 0,
-    pendingMilestones: 0,
-    releasedPayments: 0,
-    totalRevenue: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [recentLogs, setRecentLogs] = useState<any[]>([]);
-
-  const paymentHistoryData = [
-    { name: 'Jan', amount: 4000 },
-    { name: 'Feb', amount: 7500 },
-    { name: 'Mar', amount: 6200 },
-    { name: 'Apr', amount: 9000 },
-    { name: 'May', amount: 12400 },
-    { name: 'Jun', amount: 15000 },
-  ];
-
-  const milestoneStatusData = [
-    { name: 'Released', value: 45, color: '#06d6a0' },
-    { name: 'Submitted', value: 20, color: '#38bdf8' },
-    { name: 'Pending', value: 30, color: '#fbbf24' },
-    { name: 'Disputed', value: 5, color: '#ff6b6b' },
-  ];
+    totalTransactions: 0,
+  })
+  const [loading, setLoading] = useState(true)
+  const [recentLogs, setRecentLogs] = useState<any[]>([])
+  const [recentProjects, setRecentProjects] = useState<any[]>([])
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      setLoading(true)
       try {
-        setLoading(true);
-        const [contractsRes, transactionsRes, auditRes] = await Promise.all([
-          contractsApi.getAll(0, 1),
-          transactionsApi.getAll(0, 1),
-          auditApi.getAll(0, 5),
-        ]);
+        const [projRes, wsRes, contractsRes, txRes] = await Promise.allSettled([
+          discoveryApi.getProjects(),
+          workspaceApi.getAll(),
+          contractsApi.getAll(0, 10),
+          transactionsApi.getAll(0, 10),
+        ])
 
-        const contractTotal = contractsRes.data?.data?.totalElements ?? 0;
-        const txTotal = transactionsRes.data?.data?.totalElements ?? 0;
+        const projData = projRes.status === 'fulfilled' ? (projRes.value.data?.data ?? projRes.value.data ?? []) : []
+        const wsData = wsRes.status === 'fulfilled' ? (wsRes.value.data?.data ?? wsRes.value.data ?? []) : []
+        const contractsData = contractsRes.status === 'fulfilled' ? (contractsRes.value.data?.data?.content ?? contractsRes.value.data?.content ?? []) : []
+        const txData = txRes.status === 'fulfilled' ? (txRes.value.data?.data?.content ?? txRes.value.data?.content ?? []) : []
 
         setStats({
-          totalContracts: contractTotal || 12,
-          pendingMilestones: 4,
-          releasedPayments: txTotal || 18,
-          totalRevenue: 85200,
-        });
+          totalProjects: Array.isArray(projData) ? projData.length : 0,
+          activeWorkspaces: Array.isArray(wsData) ? wsData.length : 0,
+          totalContracts: Array.isArray(contractsData) ? contractsData.length : 0,
+          totalTransactions: Array.isArray(txData) ? txData.length : 0,
+        })
 
-        setRecentLogs(auditRes.data?.data?.content ?? []);
+        if (Array.isArray(projData)) {
+          setRecentProjects(projData.slice(0, 4))
+        }
+
+        if (role === 'ADMIN') {
+          try {
+            const auditRes = await auditApi.getAll(0, 5)
+            setRecentLogs(auditRes.data?.data?.content ?? auditRes.data?.content ?? [])
+          } catch {
+            setRecentLogs([])
+          }
+        }
       } catch (err) {
-        console.error('Failed to load dashboard metrics, showing fallbacks', err);
-        setStats({
-          totalContracts: 15,
-          pendingMilestones: 6,
-          releasedPayments: 24,
-          totalRevenue: 135000,
-        });
+        console.error('Failed to load metrics:', err)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchDashboardData();
-  }, []);
-
-  const quickLinks = [
-    { to: '/contracts', label: 'New Contract', icon: FileText, color: 'text-vault-teal' },
-    { to: '/milestones', label: 'Review Milestones', icon: Clock, color: 'text-vault-amber' },
-    { to: '/transactions', label: 'View Payments', icon: TrendingUp, color: 'text-vault-violet' },
-  ];
+    fetchDashboardData()
+  }, [role])
 
   return (
-    <div className="space-y-8 animate-slide-up">
-      {/* Hero banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-surface-border bg-hero-gradient p-6 md:p-8">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-vault-teal/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 w-48 h-48 bg-vault-violet/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-vault-teal/10 border border-vault-teal/20 text-vault-teal text-xs font-semibold mb-4">
-              <Activity className="w-3.5 h-3.5" />
-              Escrow vault is active
-            </div>
-            <h1 className="font-display text-3xl md:text-4xl font-bold text-white tracking-tight">
-              Welcome to{' '}
-              <span className="gradient-text">DevCollab Vault</span>
-            </h1>
-            <p className="text-slate-400 text-sm mt-3 max-w-lg leading-relaxed">
-              Monitor escrow contracts, milestone releases, and payment gateway transactions — all in one secure dashboard for startup–student collaborations.
-            </p>
+    <div className="space-y-8 animate-fade-in">
+      {/* Welcome Banner */}
+      <div className="p-8 rounded-3xl bg-gradient-to-r from-brand-900/30 via-indigo-900/20 to-slate-900 border border-brand-500/20 relative overflow-hidden backdrop-blur-xl">
+        <div className="max-w-2xl relative z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20 text-xs font-semibold mb-3">
+            <Zap className="w-3.5 h-3.5" />
+            <span>Active Role: <strong className="text-white">{role}</strong></span>
           </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            Welcome back, {user?.name || 'DevCollab Member'}!
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
+            {role === 'STUDENT' && 'Explore open freelance projects, collaborate in real-time workspaces, and earn through secured PayPal milestone payouts.'}
+            {role === 'STARTUP' && 'Post freelance projects, discover top university student talent with AI match scoring, and manage milestone escrow payments.'}
+            {role === 'ADMIN' && 'Full system telemetry: Monitor microservices health, audit trails, and manage contracts across the DevCollab platform.'}
+          </p>
+        </div>
 
-          <div className="flex flex-wrap gap-2">
-            {quickLinks.map((link) => (
+        <div className="mt-6 flex flex-wrap items-center gap-3 relative z-10">
+          {role === 'STUDENT' && (
+            <>
               <Link
-                key={link.to}
-                to={link.to}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-surface-border hover:border-vault-teal/30 hover:bg-vault-teal/5 text-sm font-medium text-slate-300 hover:text-white transition-all group"
+                to="/projects"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/20"
               >
-                <link.icon className={`w-4 h-4 ${link.color}`} />
-                {link.label}
-                <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Search className="w-4 h-4" /> Discover Projects
               </Link>
-            ))}
-          </div>
+              <Link
+                to="/applications"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold hover:bg-white/10 transition-all"
+              >
+                <Handshake className="w-4 h-4 text-emerald-400" /> My Applications
+              </Link>
+              <Link
+                to="/workspaces"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold hover:bg-white/10 transition-all"
+              >
+                <FolderGit2 className="w-4 h-4 text-indigo-400" /> My Collaborations
+              </Link>
+            </>
+          )}
+
+          {role === 'STARTUP' && (
+            <>
+              <Link
+                to="/projects"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/20"
+              >
+                <Search className="w-4 h-4" /> My Projects
+              </Link>
+              <Link
+                to="/talent"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold hover:bg-white/10 transition-all"
+              >
+                <Users className="w-4 h-4 text-brand-400" /> Find Student Talent
+              </Link>
+              <Link
+                to="/applicants"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold hover:bg-white/10 transition-all"
+              >
+                <Handshake className="w-4 h-4 text-emerald-400" /> Review Applicants
+              </Link>
+              <Link
+                to="/milestones"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold hover:bg-white/10 transition-all"
+              >
+                <DollarSign className="w-4 h-4 text-amber-400" /> Milestone Checkout
+              </Link>
+            </>
+          )}
+
+          {role === 'ADMIN' && (
+            <>
+              <Link
+                to="/audit-logs"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-500 text-white text-xs font-bold hover:bg-indigo-600 transition-all shadow-lg shadow-indigo-500/20"
+              >
+                <ShieldCheck className="w-4 h-4" /> View Security Audit Trail
+              </Link>
+              <Link
+                to="/settings"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-semibold hover:bg-white/10 transition-all"
+              >
+                System Architecture
+              </Link>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Stats bento grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
+      {/* Metric Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Contracts"
-          value={stats.totalContracts}
-          description="Matched via Discovery Service"
-          icon={FileText}
+          title="Projects in Database"
+          value={stats.totalProjects}
+          description="Postgres & Elasticsearch indexed"
+          icon={Compass}
           loading={loading}
           accent="teal"
-          trend={{ value: '+12%', isPositive: true }}
         />
         <StatCard
-          title="Pending Milestones"
-          value={stats.pendingMilestones}
-          description="Awaiting review"
-          icon={Clock}
-          loading={loading}
-          accent="amber"
-          trend={{ value: '4 actions', isPositive: false }}
-        />
-        <StatCard
-          title="Released Payments"
-          value={stats.releasedPayments}
-          description="Via PayPal Sandbox"
-          icon={CheckCircle}
+          title="Active Workspaces"
+          value={stats.activeWorkspaces}
+          description="Socket.io live channels"
+          icon={FolderGit2}
           loading={loading}
           accent="violet"
-          trend={{ value: '+28%', isPositive: true }}
         />
         <StatCard
-          title="Total Volume"
-          value={`$${stats.totalRevenue.toLocaleString('en-US')}`}
-          description="Escrowed USD"
-          icon={TrendingUp}
+          title="Escrow Contracts"
+          value={stats.totalContracts}
+          description="Secured agreements in MySQL"
+          icon={FileText}
           loading={loading}
           accent="coral"
-          trend={{ value: '+18.5%', isPositive: true }}
+        />
+        <StatCard
+          title="Transactions Ledger"
+          value={stats.totalTransactions}
+          description="PayPal Sandbox settlements"
+          icon={DollarSign}
+          loading={loading}
+          accent="amber"
         />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="card-glow p-6 lg:col-span-2 flex flex-col h-[380px]">
-          <div className="flex items-start justify-between mb-6">
+      {/* Real Recent Projects & Quick Action Panes */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left 2 Cols: Recent Projects */}
+        <div className="lg:col-span-2 p-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl shadow-2xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-white/10">
             <div>
-              <h3 className="font-display font-semibold text-white text-lg">Payment Volume</h3>
-              <p className="text-xs text-slate-500 mt-1">Monthly escrow releases (USD)</p>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Compass className="w-4 h-4 text-brand-400" />
+                Live Project Catalog
+              </h2>
+              <p className="text-[11px] text-slate-400 mt-0.5">Fetched from Service 1 (Postgres & ES 8.11)</p>
             </div>
-            <span className="text-xs font-semibold text-vault-teal bg-vault-teal/10 px-2.5 py-1 rounded-lg">
-              Last 6 months
-            </span>
-          </div>
-
-          <div className="flex-1 w-full min-h-[240px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={paymentHistoryData}>
-                <defs>
-                  <linearGradient id="tealGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#06d6a0" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#06d6a0" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="name" stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={chartTooltipStyle} />
-                <Area
-                  type="monotone"
-                  dataKey="amount"
-                  stroke="#06d6a0"
-                  strokeWidth={2.5}
-                  fillOpacity={1}
-                  fill="url(#tealGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="card p-6 flex flex-col h-[380px]">
-          <div className="mb-4">
-            <h3 className="font-display font-semibold text-white text-lg">Milestone Mix</h3>
-            <p className="text-xs text-slate-500 mt-1">Status distribution</p>
-          </div>
-
-          <div className="flex-1 flex items-center justify-center min-h-[180px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={milestoneStatusData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={78}
-                  paddingAngle={4}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {milestoneStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={chartTooltipStyle} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            {milestoneStatusData.map((item) => (
-              <div key={item.name} className="flex items-center gap-2">
-                <span
-                  className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: item.color }}
-                />
-                <span className="text-[11px] text-slate-400 truncate">
-                  {item.name} · {item.value}%
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Activity + Events */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="card-glow p-6 lg:col-span-2">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="font-display font-semibold text-white text-lg">Recent Activity</h3>
-              <p className="text-xs text-slate-500 mt-1">Immutable audit trail</p>
-            </div>
-            <Link
-              to="/audit-logs"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-vault-teal hover:text-emerald-300 transition-colors"
-            >
-              Full log <ArrowRight className="w-3.5 h-3.5" />
+            <Link to="/projects" className="text-xs text-brand-400 hover:text-brand-300 font-semibold flex items-center gap-1">
+              View All <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
-          <div className="space-y-3">
-            {recentLogs.length > 0 ? (
-              recentLogs.map((logItem: any) => (
+          {recentProjects.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-xs text-slate-400">No projects currently posted in the database.</p>
+              {role !== 'STUDENT' && (
+                <Link to="/projects" className="inline-block mt-3 px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold">
+                  Post First Project
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentProjects.map((p) => (
                 <div
-                  key={logItem.id}
-                  className="flex items-start gap-4 p-4 rounded-xl bg-white/[0.02] border border-surface-border hover:border-vault-teal/15 hover:bg-vault-teal/[0.02] transition-all"
+                  key={p.id}
+                  className="p-4 rounded-2xl bg-white/5 hover:bg-white/[0.07] border border-white/5 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
-                  <div className="p-2 rounded-lg bg-vault-teal/10 border border-vault-teal/20 text-vault-teal flex-shrink-0">
-                    <ShieldCheck className="w-4 h-4" />
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-brand-500/10 text-brand-400 border border-brand-500/20">
+                        {p.category}
+                      </span>
+                      <h3 className="text-xs font-bold text-white">{p.title}</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {(p.requiredSkills || []).slice(0, 4).map((s: string) => (
+                        <span key={s} className="px-2 py-0.5 rounded bg-white/5 text-[10px] text-slate-300 border border-white/5">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-slate-200 truncate">
-                        {logItem.action.replace(/_/g, ' ')}
-                      </span>
-                      <span className="text-[10px] text-slate-600 flex-shrink-0">
-                        {format(new Date(logItem.createdAt), 'MMM dd, HH:mm')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1 truncate">{logItem.description}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="text-[10px] bg-white/[0.04] px-2 py-0.5 rounded-md text-slate-500">
-                        {logItem.actor}
-                      </span>
-                      <span className="text-[10px] text-slate-600 font-mono">
-                        {logItem.entityType} · {logItem.entityId.slice(0, 8)}…
-                      </span>
-                    </div>
+
+                  <div className="flex items-center gap-3 sm:flex-col sm:items-end">
+                    <span className="text-xs font-bold text-emerald-400">${p.budget || 0} USD</span>
+                    <Link
+                      to={`/projects/${p.id}`}
+                      className="px-3 py-1.5 rounded-lg bg-brand-500/10 hover:bg-brand-500/20 text-brand-300 text-xs font-semibold border border-brand-500/20 flex items-center gap-1"
+                    >
+                      Details <ArrowRight className="w-3 h-3" />
+                    </Link>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-10 text-sm text-slate-500">
-                No audit events recorded yet.
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Event bus panel */}
-        <div className="card p-6 flex flex-col">
-          <div className="flex items-center gap-2 mb-5">
-            <Radio className="w-4 h-4 text-vault-violet" />
-            <h3 className="font-display font-semibold text-white text-lg">Event Bus</h3>
+        {/* Right 1 Col: Role Insights / Admin Audit */}
+        <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl shadow-2xl space-y-4">
+          <div className="pb-3 border-b border-white/10">
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-400" />
+              {role === 'ADMIN' ? 'Security Audit Activity' : 'Ecosystem Overview'}
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {role === 'ADMIN' ? 'Immutable append-only ledger' : 'Microservices connected via RabbitMQ'}
+            </p>
           </div>
 
-          <p className="text-xs text-slate-500 leading-relaxed mb-5">
-            DevCollab microservices communicate via RabbitMQ. This escrow service listens and emits payment events.
-          </p>
-
-          <div className="space-y-2.5 flex-1">
-            {[
-              { dir: 'IN', event: 'project.matched', color: 'vault-teal' },
-              { dir: 'IN', event: 'milestone.completed', color: 'vault-teal' },
-              { dir: 'OUT', event: 'payment.released', color: 'vault-violet' },
-            ].map((item) => (
-              <div
-                key={item.event}
-                className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-surface-border"
-              >
-                <span
-                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                    item.dir === 'IN'
-                      ? 'bg-vault-teal/10 text-vault-teal'
-                      : 'bg-vault-violet/10 text-vault-violet'
-                  }`}
-                >
-                  {item.dir}
-                </span>
-                <code className="text-xs text-slate-300 font-mono truncate">{item.event}</code>
+          {role === 'ADMIN' && recentLogs.length > 0 ? (
+            <div className="space-y-3">
+              {recentLogs.map((log, idx) => (
+                <div key={idx} className="p-3 rounded-xl bg-white/5 border border-white/5 text-xs space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                    <span className="font-bold text-brand-300">{log.action}</span>
+                    <span>{log.createdAt ? format(new Date(log.createdAt), 'MMM dd, HH:mm') : 'Recent'}</span>
+                  </div>
+                  <p className="text-slate-300 text-[11px] truncate">{log.details || log.entityType}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Service 1: Discovery</div>
+                <div className="text-xs text-emerald-400 font-semibold flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5" /> Spring Boot + Postgres + ES (Port 8081)
+                </div>
               </div>
-            ))}
-          </div>
-
-          <div className="mt-5 pt-4 border-t border-surface-border flex items-center gap-2 text-[11px] text-slate-600">
-            <Zap className="w-3.5 h-3.5 text-vault-amber" />
-            Provider signatures verified on capture
-          </div>
+              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Service 2: Workspace</div>
+                <div className="text-xs text-emerald-400 font-semibold flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5" /> Node.js 18 + MongoDB + WebSockets (Port 5000)
+                </div>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Service 3: Escrow</div>
+                <div className="text-xs text-emerald-400 font-semibold flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5" /> Spring Boot + MySQL + PayPal Sandbox (Port 8080)
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
-  );
-};
+  )
+}

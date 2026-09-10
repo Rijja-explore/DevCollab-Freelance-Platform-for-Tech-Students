@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { discoveryApi } from '../api/client'
-import { Play, Code, Copy } from 'lucide-react'
+import { Play, Copy } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { ServiceHeader } from '../components/ServiceHeader'
 
 const SAMPLE_QUERIES = [
   {
@@ -95,25 +96,22 @@ export const GraphQLPlayground: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Code className="w-6 h-6 text-brand-400" />
-            GraphQL Explorer
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Execute queries and mutations against the Discovery & Matching GraphQL endpoint (<code className="text-brand-300 font-mono">/graphql</code>).
-          </p>
-        </div>
-        <button
-          onClick={handleExecute}
-          disabled={loading}
-          className="btn-primary flex items-center gap-2 self-start sm:self-auto"
-        >
-          <Play className="w-4 h-4 fill-white" />
-          {loading ? 'Executing...' : 'Run Query'}
-        </button>
-      </div>
+      {/* Service 1 Discovery Banner */}
+      <ServiceHeader
+        service="discovery"
+        title="GraphQL API Explorer"
+        subtitle="Test interactive queries and mutations against Spring Boot Discovery & Matching schema (/graphql) with PostgreSQL and Elasticsearch."
+        action={
+          <button
+            onClick={handleExecute}
+            disabled={loading}
+            className="btn-primary flex items-center gap-2 self-start sm:self-auto bg-indigo-600 hover:bg-indigo-500"
+          >
+            <Play className="w-4 h-4 fill-white" />
+            {loading ? 'Executing...' : 'Run Query'}
+          </button>
+        }
+      />
 
       {/* Preset Query Templates */}
       <div className="flex items-center gap-2 flex-wrap">

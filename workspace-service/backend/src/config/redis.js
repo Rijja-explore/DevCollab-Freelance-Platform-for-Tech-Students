@@ -17,10 +17,11 @@ let redisClient = null;
 
 export const initializeRedis = async () => {
   try {
-    const redisUrl = process.env.REDIS_URL;
+    const redisUrl = process.env.REDIS_URL || 
+      (process.env.REDIS_HOST ? `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}` : null);
 
     if (!redisUrl) {
-      throw new Error('REDIS_URL environment variable is not set');
+      throw new Error('REDIS_URL or REDIS_HOST environment variable is not set');
     }
 
     // Create Redis client

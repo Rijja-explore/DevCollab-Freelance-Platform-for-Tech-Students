@@ -13,6 +13,28 @@ import { authenticate } from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 /**
+ * GET /api/workspaces
+ * Get all workspaces
+ * Requires authentication
+ */
+router.get(
+  '/',
+  authenticate,
+  workspaceController.getAllWorkspaces
+);
+
+/**
+ * POST /api/workspaces
+ * Create a new workspace
+ * Requires authentication
+ */
+router.post(
+  '/',
+  authenticate,
+  workspaceController.createWorkspace
+);
+
+/**
  * GET /api/workspaces/:id
  * Get workspace by workspace ID
  * Requires authentication

@@ -7,8 +7,11 @@ import { StatusBadge } from '../components/StatusBadge';
 import { format } from 'date-fns';
 import { Plus, X, Search, Calendar, ChevronRight, Ban } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { ServiceHeader } from '../components/ServiceHeader';
 
 export const Contracts: React.FC = () => {
+  const { role } = useAuth();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -79,28 +82,31 @@ export const Contracts: React.FC = () => {
     });
   };
 
-  const contractsList = contractsData?.content ?? [];
-  const totalPages = contractsData?.totalPages ?? 1;
+  const contractsList = contractsData?.content ?? contractsData?.data?.content ?? (Array.isArray(contractsData) ? contractsData : []);
+  const totalPages = contractsData?.totalPages ?? contractsData?.data?.totalPages ?? 1;
 
   const filteredContracts = contractsList.filter(
     (c: any) =>
-      c.title.toLowerCase().includes(search.toLowerCase()) ||
-      c.id.toLowerCase().includes(search.toLowerCase())
+      c?.title?.toLowerCase().includes(search.toLowerCase()) ||
+      c?.id?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="page-header mb-0">
-          <h1 className="page-title">Escrow Contracts</h1>
-          <p className="page-subtitle">Manage project agreements escrowed on the DevCollab network.</p>
-        </div>
-        <button onClick={() => setShowCreateModal(true)} className="btn-primary">
-          <Plus className="w-4 h-4" />
-          Create Contract
-        </button>
-      </div>
+      {/* Service 3 Escrow Banner */}
+      <ServiceHeader
+        service="escrow"
+        title="Escrow Contracts"
+        subtitle="Manage legally-binding freelance agreements with automated milestone funding and PayPal Sandbox escrow vault."
+        action={
+          (role === 'STARTUP' || role === 'ADMIN') ? (
+            <button onClick={() => setShowCreateModal(true)} className="btn-primary">
+              <Plus className="w-4 h-4" />
+              Create Contract
+            </button>
+          ) : undefined
+        }
+      />
 
       {/* Filter and Search Bar */}
       <div className="card p-4 flex items-center gap-4">
@@ -122,9 +128,9 @@ export const Contracts: React.FC = () => {
       ) : filteredContracts.length === 0 ? (
         <EmptyState
           title="No contracts found"
-          description="Matched matches create contracts automatically via Service A, or you can create one manually."
-          actionText="Create Contract"
-          onAction={() => setShowCreateModal(true)}
+          description="Matched projects generate escrow agreements automatically, or startup founders can create one manually."
+          actionText={(role === 'STARTUP' || role === 'ADMIN') ? 'Create Contract' : undefined}
+          onAction={(role === 'STARTUP' || role === 'ADMIN') ? () => setShowCreateModal(true) : undefined}
         />
       ) : (
         <div className="card overflow-hidden">

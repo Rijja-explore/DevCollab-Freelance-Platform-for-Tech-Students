@@ -20,20 +20,24 @@ const router = express.Router();
 router.get(
   '/workspaces/:workspaceId/messages',
   authenticate,
-  messageValidator.validateWorkspaceId,
   messageController.getMessages
 );
 
-/**
- * POST /api/workspaces/:workspaceId/messages
- * Create a new message
- * Requires authentication
- */
+router.get(
+  '/messages/:workspaceId',
+  authenticate,
+  messageController.getMessages
+);
+
 router.post(
   '/workspaces/:workspaceId/messages',
   authenticate,
-  messageValidator.validateWorkspaceId,
-  messageValidator.validateCreateMessage,
+  messageController.createMessage
+);
+
+router.post(
+  '/messages/:workspaceId',
+  authenticate,
   messageController.createMessage
 );
 

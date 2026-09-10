@@ -90,43 +90,4 @@ CREATE TABLE IF NOT EXISTS matches (
 CREATE INDEX idx_matches_student ON matches(student_id);
 CREATE INDEX idx_matches_project ON matches(project_id);
 
--- Seed Data: Sample Projects
-INSERT INTO projects (id, startup_id, title, description, category, budget, currency, status)
-VALUES 
-('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'AI-Powered Resume Analyzer', 'Build a real-time natural language processing tool that screens tech student resumes against job descriptions.', 'AI/ML', 1500.00, 'USD', 'OPEN'),
-('22222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Decentralized Micro-Payment Escrow', 'Create a fast, secure milestone payment tracking system with webhook verification and live dashboards.', 'Fintech', 2400.00, 'USD', 'OPEN'),
-('33333333-3333-3333-3333-333333333333', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Collaborative Code Review Canvas', 'Develop a multi-tenant workspace with real-time Socket.io chat, code snippets, and automated review markers.', 'Web Development', 1800.00, 'USD', 'OPEN'),
-('44444444-4444-4444-4444-444444444444', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Cross-Platform React Native Student App', 'Design and implement mobile application for freelance campus tasks with push notifications.', 'Mobile', 2000.00, 'USD', 'OPEN')
-ON CONFLICT (id) DO NOTHING;
-
--- Seed Project Skills
-INSERT INTO project_skills (project_id, skill) VALUES
-('11111111-1111-1111-1111-111111111111', 'Python'),
-('11111111-1111-1111-1111-111111111111', 'FastAPI'),
-('11111111-1111-1111-1111-111111111111', 'NLP'),
-('22222222-2222-2222-2222-222222222222', 'Java'),
-('22222222-2222-2222-2222-222222222222', 'Spring Boot'),
-('22222222-2222-2222-2222-222222222222', 'PayPal API'),
-('33333333-3333-3333-3333-333333333333', 'React'),
-('33333333-3333-3333-3333-333333333333', 'Node.js'),
-('33333333-3333-3333-3333-333333333333', 'Socket.io'),
-('33333333-3333-3333-3333-333333333333', 'MongoDB'),
-('44444444-4444-4444-4444-444444444444', 'React Native'),
-('44444444-4444-4444-4444-444444444444', 'TypeScript'),
-('44444444-4444-4444-4444-444444444444', 'GraphQL')
-ON CONFLICT DO NOTHING;
-
--- Seed Student Profile
-INSERT INTO student_profiles (id, user_id, full_name, headline, bio, hourly_rate, rating)
-VALUES 
-('99999999-9999-9999-9999-999999999999', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Alex Chen', 'Fullstack & Cloud Engineering Student', 'CS senior with 3 years building microservices, React dashboards, and payment architectures.', 40.00, 4.95)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO student_skills (student_id, skill) VALUES
-('99999999-9999-9999-9999-999999999999', 'React'),
-('99999999-9999-9999-9999-999999999999', 'TypeScript'),
-('99999999-9999-9999-9999-999999999999', 'Node.js'),
-('99999999-9999-9999-9999-999999999999', 'Java'),
-('99999999-9999-9999-9999-999999999999', 'Spring Boot'),
-('99999999-9999-9999-9999-999999999999', 'GraphQL')
-ON CONFLICT DO NOTHING;
+-- Indexes are created above. Database starts clean.

@@ -5,6 +5,7 @@ import { TableSkeleton } from '../components/LoadingSkeleton';
 import { StatusBadge } from '../components/StatusBadge';
 import { format } from 'date-fns';
 import { Calendar, Search } from 'lucide-react';
+import { ServiceHeader } from '../components/ServiceHeader';
 
 export const Transactions: React.FC = () => {
   const [page, setPage] = useState(0);
@@ -20,8 +21,8 @@ export const Transactions: React.FC = () => {
     fetchTransactions(page);
   }, [page, fetchTransactions]);
 
-  const transactionsList = transactionsData?.content ?? [];
-  const totalPages = transactionsData?.totalPages ?? 1;
+  const transactionsList = transactionsData?.content ?? transactionsData?.data?.content ?? (Array.isArray(transactionsData) ? transactionsData : []);
+  const totalPages = transactionsData?.totalPages ?? transactionsData?.data?.totalPages ?? 1;
 
   const filteredTransactions = transactionsList.filter(
     (tx: any) =>
@@ -32,11 +33,12 @@ export const Transactions: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="page-header">
-        <h1 className="page-title">Transactions Ledger</h1>
-        <p className="page-subtitle">Historical log of all payment transfers initiated, capture results, and provider orders.</p>
-      </div>
+      {/* Service 3 Escrow Banner */}
+      <ServiceHeader
+        service="escrow"
+        title="Transactions & Settlement Ledger"
+        subtitle="Immutable audit record of PayPal authorizations, escrow holds, fee splits, and completed disbursements."
+      />
 
       {/* Filter and Search Bar */}
       <div className="card p-4 flex items-center gap-4">

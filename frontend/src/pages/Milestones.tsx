@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { ServiceHeader } from '../components/ServiceHeader';
 
 const isPayPalConfigured = Boolean(import.meta.env.VITE_PAYPAL_CLIENT_ID);
 
@@ -120,7 +121,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onCapture
   );
 };
 
+import { useAuth } from '../contexts/AuthContext';
+
 export const Milestones: React.FC = () => {
+  const { role } = useAuth();
   const [searchParams] = useSearchParams();
   const contractIdParam = searchParams.get('contractId');
 
@@ -214,8 +218,8 @@ export const Milestones: React.FC = () => {
     fetchMilestones(page);
   };
 
-  const milestonesList = milestonesData?.content ?? [];
-  const totalPages = milestonesData?.totalPages ?? 1;
+  const milestonesList = milestonesData?.content ?? milestonesData?.data?.content ?? (Array.isArray(milestonesData) ? milestonesData : []);
+  const totalPages = milestonesData?.totalPages ?? milestonesData?.data?.totalPages ?? 1;
 
   // Filter milestones if contractId parameter is present
   const filteredMilestones = contractIdParam
@@ -224,11 +228,12 @@ export const Milestones: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="page-header">
-        <h1 className="page-title">Escrow Milestones</h1>
-        <p className="page-subtitle">Track project phases, work submissions, and release payments securely.</p>
-      </div>
+      {/* Service 3 Escrow Banner */}
+      <ServiceHeader
+        service="escrow"
+        title="Escrow Milestones & PayPal Checkout"
+        subtitle="Track project deliverables, initiate PayPal sandbox order authorizations, and capture milestone disbursements."
+      />
 
       {selectedContract && (
         <div className="card p-4 border border-brand-500/20 bg-brand-500/5 flex items-center justify-between">
@@ -305,31 +310,61 @@ export const Milestones: React.FC = () => {
                     </td>
                     <td className="table-cell text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {milestone.status === 'SUBMITTED' && (
-                          <button
-                            onClick={() => handleApprove(milestone.id)}
-                            disabled={approving}
-                            className="btn-secondary py-1 px-2.5 text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Approve
-                          </button>
-                        )}
-                        {milestone.status === 'APPROVED' && (
-                          <button
-                            onClick={() =>
-                              handlePay(
-                                milestone.id,
-                                milestone.amount,
-                                milestone.title
-                              )
-                            }
-                            disabled={releasing}
-                            className="btn-primary py-1 px-2.5 text-xs flex items-center gap-1"
-                          >
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                            Pay Release
-                          </button>
+                        {(role === 'STARTUP' || role === 'ADMIN') ? (
+                          <>
+                            {(milestone.status === 'PENDING' || milestone.status === 'SUBMITTED' || milestone.status === 'IN_PROGRESS') && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await handleApprove(milestone.id);
+                                    await handlePay(milestone.id, milestone.amount, milestone.title);
+                                  } catch (err) {
+                                    handlePay(milestone.id, milestone.amount, milestone.title);
+                                  }
+                                }}
+                                disabled={approving || releasing}
+                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#ffc439] to-[#f4b628] hover:brightness-105 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/10 flex items-center gap-1.5 transition-all"
+                              >
+                                <Play className="w-3 h-3 fill-current" />
+                                Fund via PayPal
+                              </button>
+                            )}
+                            {milestone.status === 'APPROVED' && (
+                              <button
+                                onClick={() =>
+                                  handlePay(
+                                    milestone.id,
+                                    milestone.amount,
+                                    milestone.title
+                                  )
+                                }
+                                disabled={releasing}
+                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold text-xs shadow-md shadow-emerald-500/10 flex items-center gap-1.5 transition-all"
+                              >
+                                <Play className="w-3 h-3 fill-current" />
+                                Pay Release (PayPal)
+                              </button>
+                            )}
+                            {milestone.status === 'RELEASED' && (
+                              <Link
+                                to="/payments"
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:underline"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                Payout Disbursed
+                              </Link>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 font-medium">
+                            {milestone.status === 'RELEASED' ? (
+                              <Link to="/payments" className="text-emerald-400 hover:underline">
+                                ✓ Paid & Settled
+                              </Link>
+                            ) : (
+                              'Milestone in Escrow Vault'
+                            )}
+                          </span>
                         )}
                       </div>
                     </td>

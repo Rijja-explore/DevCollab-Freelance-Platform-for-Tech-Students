@@ -64,7 +64,69 @@ export const getWorkspaceByProjectId = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/workspaces
+ * Get all workspaces (optionally filtered by user)
+ */
+export const getAllWorkspaces = async (req, res, next) => {
+  try {
+    const filter = {};
+    if (req.user && req.user.role !== 'admin' && req.user.role !== 'ADMIN') {
+      filter.userId = req.user.id;
+    }
+    
+    logger.info(`Getting all workspaces (user: ${req.user?.id || 'all'})`);
+    const result = await workspaceService.getAllWorkspaces(filter);
+    
+    if (!result.success) {
+      return res.status(result.statusCode || 500).json({
+        success: false,
+        message: result.message
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: result.data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/workspaces
+ * Create a new workspace
+ */
+export const createWorkspace = async (req, res, next) => {
+  try {
+    const workspaceData = {
+      ...req.body,
+      startupId: req.body.startupId || req.user?.id
+    };
+    
+    logger.info(`Creating workspace for project: ${workspaceData.projectId}`);
+    const result = await workspaceService.createWorkspace(workspaceData);
+    
+    if (!result.success) {
+      return res.status(result.statusCode || 500).json({
+        success: false,
+        message: result.message
+      });
+    }
+    
+    res.status(result.statusCode || 201).json({
+      success: true,
+      data: result.data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
+  getAllWorkspaces,
   getWorkspaceById,
-  getWorkspaceByProjectId
+  getWorkspaceByProjectId,
+  createWorkspace
 };

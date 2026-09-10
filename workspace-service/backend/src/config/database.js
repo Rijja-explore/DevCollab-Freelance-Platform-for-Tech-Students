@@ -18,10 +18,10 @@ let mongoConnection = null;
 
 export const connectDatabase = async () => {
   try {
-    const mongoUri = process.env.MONGO_URI;
+    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
 
     if (!mongoUri) {
-      throw new Error('MONGO_URI environment variable is not set');
+      throw new Error('MONGODB_URI / MONGO_URI environment variable is not set');
     }
 
     // Configure Mongoose

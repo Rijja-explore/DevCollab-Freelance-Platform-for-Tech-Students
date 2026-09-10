@@ -37,8 +37,12 @@ client.interceptors.response.use(
 export const authApi = {
   getToken: (role = 'STARTUP', userId?: string, email?: string, name?: string) =>
     client.post('/api/auth/token', { role, userId, email, name }),
-  login: (email: string) =>
-    client.post('/api/auth/login', { email }),
+  login: (email: string, password?: string) =>
+    client.post('/api/auth/login', { email, password }),
+  register: (data: unknown) =>
+    client.post('/api/auth/register', data),
+  getMe: () =>
+    client.get('/api/auth/me'),
 }
 
 // ─── Discovery & Matching Service API ─────────────────────────────────────────
@@ -64,6 +68,12 @@ export const discoveryApi = {
     client.get(`/api/matches/recommendations/${studentId}`),
   match: (projectId: string, studentId: string) =>
     client.post('/api/matches', { projectId, studentId }),
+  getAllMatches: () =>
+    client.get('/api/matches'),
+  getStudentMatches: (studentId: string) =>
+    client.get(`/api/matches/student/${studentId}`),
+  getStartupMatches: (startupId: string) =>
+    client.get(`/api/matches/startup/${startupId}`),
   getStudentProfiles: () =>
     client.get('/api/profiles/students'),
   graphql: (query: string, variables: Record<string, unknown> = {}) =>

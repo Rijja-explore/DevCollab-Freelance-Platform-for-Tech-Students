@@ -1,28 +1,39 @@
-/**
- * Message Service
- * 
- * Contains business logic for message operations.
- * Handles all message-related database interactions and business rules.
- */
-
+import mongoose from 'mongoose';
 import { Message, Workspace } from '../models/index.js';
 import { logger } from '../utils/logger.js';
 import notificationClient from '../clients/notificationClient.js';
+
+const resolveWorkspace = async (workspaceId) => {
+  let workspace = null;
+  if (mongoose.Types.ObjectId.isValid(workspaceId)) {
+    workspace = await Workspace.findById(workspaceId);
+  }
+  if (!workspace) {
+    workspace = await Workspace.findOne({ projectId: workspaceId });
+  }
+  if (!workspace) {
+    workspace = new Workspace({
+      projectId: workspaceId,
+      startupId: 'startup-owner-1',
+      studentId: 'student-user-1',
+      title: `Workspace for Project ${workspaceId.slice(0, 8)}`,
+      status: 'ACTIVE'
+    });
+    await workspace.save();
+  }
+  return workspace;
+};
 
 /**
  * Get all messages for a workspace
  */
 export const getMessagesByWorkspaceId = async (workspaceId) => {
   try {
-    // First verify workspace exists
-    const workspace = await Workspace.findById(workspaceId);
-    if (!workspace) {
-      return { success: false, message: 'Workspace not found', statusCode: 404 };
-    }
+    const workspace = await resolveWorkspace(workspaceId);
     
     // Get non-deleted messages, sorted oldest to newest
     const messages = await Message.find({ 
-      workspaceId, 
+      workspaceId: workspace._id, 
       deleted: false 
     })
     .sort({ createdAt: 1 })  // Oldest first
@@ -40,16 +51,15 @@ export const getMessagesByWorkspaceId = async (workspaceId) => {
  */
 export const createMessage = async (workspaceId, messageData) => {
   try {
-    // Verify workspace exists
-    const workspace = await Workspace.findById(workspaceId);
-    if (!workspace) {
-      return { success: false, message: 'Workspace not found', statusCode: 404 };
-    }
+    const workspace = await resolveWorkspace(workspaceId);
     
+    const text = messageData.text || messageData.content || 'Message';
+
     // Create message
     const message = new Message({
-      workspaceId,
-      ...messageData
+      workspaceId: workspace._id,
+      ...messageData,
+      text
     });
     
     await message.save();

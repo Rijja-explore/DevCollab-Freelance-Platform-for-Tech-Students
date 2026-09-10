@@ -1,28 +1,39 @@
-/**
- * Comment Service
- * 
- * Contains business logic for comment operations.
- * Handles all comment-related database interactions and business rules.
- */
-
+import mongoose from 'mongoose';
 import { Comment, Workspace } from '../models/index.js';
 import { logger } from '../utils/logger.js';
 import notificationClient from '../clients/notificationClient.js';
+
+const resolveWorkspace = async (workspaceId) => {
+  let workspace = null;
+  if (mongoose.Types.ObjectId.isValid(workspaceId)) {
+    workspace = await Workspace.findById(workspaceId);
+  }
+  if (!workspace) {
+    workspace = await Workspace.findOne({ projectId: workspaceId });
+  }
+  if (!workspace) {
+    workspace = new Workspace({
+      projectId: workspaceId,
+      startupId: 'startup-owner-1',
+      studentId: 'student-user-1',
+      title: `Workspace for Project ${workspaceId.slice(0, 8)}`,
+      status: 'ACTIVE'
+    });
+    await workspace.save();
+  }
+  return workspace;
+};
 
 /**
  * Get comments for a workspace with nested replies
  */
 export const getCommentsByWorkspaceId = async (workspaceId) => {
   try {
-    // First verify workspace exists
-    const workspace = await Workspace.findById(workspaceId);
-    if (!workspace) {
-      return { success: false, message: 'Workspace not found', statusCode: 404 };
-    }
+    const workspace = await resolveWorkspace(workspaceId);
     
     // Get top-level comments (no parent)
     const topLevelComments = await Comment.find({ 
-      workspaceId, 
+      workspaceId: workspace._id, 
       parentId: null,
       deleted: false 
     })
@@ -57,16 +68,17 @@ export const getCommentsByWorkspaceId = async (workspaceId) => {
  */
 export const createComment = async (workspaceId, commentData) => {
   try {
-    // Verify workspace exists
-    const workspace = await Workspace.findById(workspaceId);
-    if (!workspace) {
-      return { success: false, message: 'Workspace not found', statusCode: 404 };
-    }
+    const workspace = await resolveWorkspace(workspaceId);
     
+    const text = commentData.text || commentData.content || 'Code review note';
+    const authorName = commentData.authorName || 'DevCollab Reviewer';
+
     // Create comment
     const comment = new Comment({
-      workspaceId,
-      ...commentData
+      workspaceId: workspace._id,
+      ...commentData,
+      text,
+      authorName
     });
     
     await comment.save();

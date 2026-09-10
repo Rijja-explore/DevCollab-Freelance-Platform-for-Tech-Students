@@ -18,6 +18,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 public class Project {
 
     @Id
@@ -52,7 +53,15 @@ public class Project {
     @CollectionTable(name = "project_skills", joinColumns = @JoinColumn(name = "project_id"))
     @Column(name = "skill", length = 100)
     @Builder.Default
+    @com.fasterxml.jackson.databind.annotation.JsonDeserialize(as = java.util.HashSet.class)
     private Set<String> requiredSkills = new HashSet<>();
+
+    public Set<String> getRequiredSkills() {
+        if (requiredSkills == null) {
+            return new HashSet<>();
+        }
+        return new HashSet<>(requiredSkills);
+    }
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

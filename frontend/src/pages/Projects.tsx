@@ -1,24 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { discoveryApi } from '../api/client'
-import { useApi } from '../hooks/useApi'
 import { StatusBadge } from '../components/StatusBadge'
 import { TableSkeleton } from '../components/LoadingSkeleton'
 import { EmptyState } from '../components/EmptyState'
 import {
   Search,
   Plus,
-  Compass,
-  Sparkles,
   DollarSign,
-  Tag,
   ArrowRight,
+  X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
+import { ServiceHeader } from '../components/ServiceHeader'
+
 
 interface Project {
   id: string
-  startupId: string
+  startupId?: string
   title: string
   description: string
   category: string
@@ -29,57 +29,56 @@ interface Project {
   createdAt: string
 }
 
-export const Projects: React.FC = () => {
+export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpenModal = false }) => {
   const navigate = useNavigate()
+  const { user, role } = useAuth()
   const [category, setCategory] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [matchingProjectId, setMatchingProjectId] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(defaultOpenModal)
+  const [loading, setLoading] = useState(true)
+  const [projectsList, setProjectsList] = useState<Project[]>([])
 
   // Form State
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [formCategory, setFormCategory] = useState('Web Development')
   const [budget, setBudget] = useState('')
-  const [currency] = useState('USD')
   const [skillsInput, setSkillsInput] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const {
-    data: projectsResponse,
-    loading,
-    execute: fetchProjects,
-  } = useApi<any, [string?, string?]>(discoveryApi.getProjects)
-
-  const loadProjects = useCallback(() => {
-    if (searchQuery.trim()) {
-      discoveryApi.search(searchQuery.trim()).then((res) => {
-        setProjectsList(res.data?.data ?? [])
-      })
-    } else {
-      const cat = category === 'ALL' ? undefined : category
-      fetchProjects(cat, undefined)
+  const loadProjects = useCallback(async () => {
+    setLoading(true)
+    try {
+      if (searchQuery.trim()) {
+        const res = await discoveryApi.search(searchQuery.trim())
+        const data = res.data?.data ?? res.data ?? []
+        setProjectsList(Array.isArray(data) ? data : [])
+      } else {
+        const cat = category === 'ALL' ? undefined : category
+        const res = await discoveryApi.getProjects(cat, undefined)
+        const data = res.data?.data ?? res.data ?? []
+        setProjectsList(Array.isArray(data) ? data : [])
+      }
+    } catch (err) {
+      console.error('Error loading projects:', err)
+      setProjectsList([])
+    } finally {
+      setLoading(false)
     }
-  }, [category, searchQuery, fetchProjects])
-
-  const [projectsList, setProjectsList] = useState<Project[]>([])
+  }, [category, searchQuery])
 
   useEffect(() => {
     loadProjects()
   }, [loadProjects])
 
-  useEffect(() => {
-    if (projectsResponse?.data) {
-      setProjectsList(projectsResponse.data)
-    }
-  }, [projectsResponse])
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value
-    setSearchQuery(val)
-  }
-
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!title.trim() || !description.trim() || !budget) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    setSubmitting(true)
     try {
       const skills = skillsInput
         .split(',')
@@ -87,13 +86,15 @@ export const Projects: React.FC = () => {
         .filter(Boolean)
 
       await discoveryApi.createProject({
+        startupId: user?.id || 'startup-owner-1',
         title,
         description,
         category: formCategory,
         budget: parseFloat(budget),
-        currency,
-        requiredSkills: skills,
+        currency: 'USD',
+        requiredSkills: skills.length > 0 ? skills : ['React', 'TypeScript'],
       })
+
       toast.success('Project created and indexed in Elasticsearch!')
       setShowCreateModal(false)
       setTitle('')
@@ -101,286 +102,234 @@ export const Projects: React.FC = () => {
       setBudget('')
       setSkillsInput('')
       loadProjects()
-    } catch (err: any) {
-      console.error(err)
+    } catch (err) {
       toast.error('Failed to create project')
-    }
-  }
-
-  const handleMatch = async (project: Project) => {
-    setMatchingProjectId(project.id)
-    try {
-      const studentId = '99999999-9999-9999-9999-999999999999' // Demo student UUID
-      const res = await discoveryApi.match(project.id, studentId)
-      toast.success(
-        res.data?.data?.message ??
-          'Matched! Contract created in Escrow & Workspace initialized.',
-        { duration: 5000 },
-      )
-      loadProjects()
-    } catch (err: any) {
       console.error(err)
-      toast.error('Matching failed')
     } finally {
-      setMatchingProjectId(null)
+      setSubmitting(false)
     }
   }
 
-  const categories = ['ALL', 'AI/ML', 'Web Development', 'Fintech', 'Mobile']
+  const categories = [
+    'ALL',
+    'Web Development',
+    'Mobile Development',
+    'AI / Machine Learning',
+    'DevOps & Cloud',
+    'Cybersecurity',
+    'UI/UX Design',
+  ]
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Compass className="w-6 h-6 text-brand-400" />
-            Project Discovery & Matching
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Browse freelance tech opportunities, search via Elasticsearch, and match in real-time.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/recommendations')}
-            className="btn-secondary flex items-center gap-2"
-          >
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            AI Match Suggestions
-          </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Post New Project
-          </button>
-        </div>
-      </div>
-
-      {/* Filter & Search Bar */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/5 border border-white/10 rounded-2xl p-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          {categories.map((cat) => (
+      {/* Service 1 Discovery Banner */}
+      <ServiceHeader
+        service="discovery"
+        title="Projects & Opportunities"
+        subtitle="Browse, filter, and search freelance software projects indexed across PostgreSQL & Elasticsearch 8.11."
+        action={
+          (role === 'STARTUP' || role === 'ADMIN') ? (
             <button
-              key={cat}
-              onClick={() => {
-                setCategory(cat)
-                setSearchQuery('')
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                category === cat
-                  ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20'
-                  : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'
-              }`}
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/30"
             >
-              {cat}
+              <Plus className="w-4 h-4" /> Post New Project
             </button>
-          ))}
-        </div>
+          ) : undefined
+        }
+      />
 
-        <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative flex-1 w-full">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <Search className="w-4 h-4" />
+          </div>
           <input
             type="text"
             value={searchQuery}
-            onChange={handleSearchChange}
-            placeholder="Search projects via Elasticsearch..."
-            className="w-full bg-slate-900/60 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search projects by title, description or tech stack (e.g. Next.js, FastAPI)..."
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500 transition-all"
           />
         </div>
+
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500 cursor-pointer"
+        >
+          {categories.map((c) => (
+            <option key={c} value={c} className="bg-slate-900 text-white">
+              {c === 'ALL' ? 'All Categories' : c}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Projects Grid */}
+      {/* Project Grid */}
       {loading ? (
         <TableSkeleton rows={4} />
       ) : projectsList.length === 0 ? (
         <EmptyState
           title="No projects found"
-          description="Try modifying your search or filter criteria, or post a new project."
-          actionText="Post Project"
-          onAction={() => setShowCreateModal(true)}
+          description="Try adjusting your search criteria or filter, or post a new project."
+          actionText={role !== 'STUDENT' ? 'Post Project' : undefined}
+          onAction={role !== 'STUDENT' ? () => setShowCreateModal(true) : undefined}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {projectsList.map((project) => (
             <div
               key={project.id}
-              className="card p-6 flex flex-col justify-between hover:border-brand-500/30 transition-all group relative overflow-hidden"
+              className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 hover:border-brand-500/30 transition-all backdrop-blur-xl flex flex-col justify-between group shadow-xl"
             >
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <span className="text-[10px] font-semibold tracking-wider uppercase px-2.5 py-1 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20">
-                      {project.category}
-                    </span>
-                    <h3 className="text-lg font-bold text-white mt-2 group-hover:text-brand-300 transition-colors">
-                      {project.title}
-                    </h3>
-                  </div>
-                  <StatusBadge status={project.status} />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-brand-500/10 text-brand-400 border border-brand-500/20">
+                    {project.category}
+                  </span>
+                  <StatusBadge status={project.status || 'OPEN'} />
                 </div>
 
-                <p className="text-sm text-slate-300 line-clamp-3 leading-relaxed">
+                <h3 className="text-base font-bold text-white group-hover:text-brand-300 transition-colors line-clamp-1">
+                  {project.title}
+                </h3>
+
+                <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
                   {project.description}
                 </p>
 
                 {/* Skills */}
-                <div className="flex flex-wrap gap-1.5 pt-2">
-                  {project.requiredSkills?.map((skill, idx) => (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {(project.requiredSkills || []).slice(0, 4).map((s) => (
                     <span
-                      key={idx}
-                      className="text-[11px] font-medium px-2 py-0.5 rounded bg-white/5 text-slate-400 border border-white/5 flex items-center gap-1"
+                      key={s}
+                      className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/5 text-[10px] text-slate-300 font-medium"
                     >
-                      <Tag className="w-2.5 h-2.5 text-brand-400" />
-                      {skill}
+                      {s}
                     </span>
                   ))}
+                  {(project.requiredSkills || []).length > 4 && (
+                    <span className="px-1.5 py-0.5 text-[10px] text-slate-500">
+                      +{(project.requiredSkills || []).length - 4} more
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Bottom Actions */}
-              <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                    Budget
-                  </span>
-                  <span className="text-lg font-extrabold text-white flex items-center gap-1">
-                    <DollarSign className="w-4 h-4 text-emerald-400 -mr-1" />
-                    {project.budget?.toLocaleString()}{' '}
-                    <span className="text-xs font-normal text-slate-400">
-                      {project.currency}
-                    </span>
-                  </span>
+              <div className="pt-5 mt-4 border-t border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-1 font-bold text-emerald-400 text-sm">
+                  <DollarSign className="w-4 h-4" />
+                  <span>{project.budget?.toLocaleString()} {project.currency || 'USD'}</span>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {project.status === 'OPEN' ? (
-                    <button
-                      onClick={() => handleMatch(project)}
-                      disabled={matchingProjectId === project.id}
-                      className="btn-primary text-xs flex items-center gap-1.5 py-2 px-3"
-                    >
-                      {matchingProjectId === project.id ? (
-                        'Matching...'
-                      ) : (
-                        <>
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Match & Launch
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => navigate('/contracts')}
-                      className="btn-secondary text-xs flex items-center gap-1.5 py-2 px-3"
-                    >
-                      View Contract
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/projects/${project.id}`)}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-brand-400 hover:text-white transition-colors"
+                >
+                  View Details <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Create Project Modal */}
+      {/* Post Project Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="card w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl border-white/20">
-            <div className="p-6 border-b border-white/10 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-white">Post a New Project</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Publish to Discovery and index immediately in Elasticsearch.
-                </p>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="max-w-lg w-full p-6 rounded-3xl bg-slate-900 border border-white/10 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-bold text-white">Post New Project</h3>
               <button
+                type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-white text-lg font-bold"
+                className="text-slate-400 hover:text-white"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateProject} className="p-6 overflow-y-auto space-y-4">
+            <form onSubmit={handleCreateProject} className="space-y-4">
               <div>
-                <label className="label">Project Title</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Title</label>
                 <input
                   type="text"
-                  required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Next.js SaaS Authentication & Dashboard"
-                  className="input"
+                  placeholder="e.g. Next.js & GraphQL Freelance Dashboard"
+                  required
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">Category</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Category</label>
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value)}
-                    className="input"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
                   >
-                    <option value="Web Development">Web Development</option>
-                    <option value="AI/ML">AI/ML</option>
-                    <option value="Fintech">Fintech</option>
-                    <option value="Mobile">Mobile</option>
-                    <option value="DevOps">DevOps</option>
+                    {categories.filter((c) => c !== 'ALL').map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label className="label">Budget (USD)</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Budget ($ USD)</label>
                   <input
                     type="number"
-                    required
                     value={budget}
                     onChange={(e) => setBudget(e.target.value)}
-                    placeholder="e.g. 1500"
-                    className="input"
+                    placeholder="1200"
+                    required
+                    min="50"
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="label">Required Skills (comma separated)</label>
-                <input
-                  type="text"
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Detailed requirements, deliverables, and expectations..."
                   required
-                  value={skillsInput}
-                  onChange={(e) => setSkillsInput(e.target.value)}
-                  placeholder="React, TypeScript, Spring Boot, PostgreSQL"
-                  className="input"
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
                 />
               </div>
 
               <div>
-                <label className="label">Detailed Description & Scope</label>
-                <textarea
-                  rows={4}
-                  required
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Provide scope of work, technical requirements, and deliverable expectations..."
-                  className="input py-2"
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Required Skills (comma-separated)</label>
+                <input
+                  type="text"
+                  value={skillsInput}
+                  onChange={(e) => setSkillsInput(e.target.value)}
+                  placeholder="React, TypeScript, Spring Boot, MySQL"
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+              <div className="pt-3 border-t border-white/10 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="btn-secondary"
+                  className="px-4 py-2 rounded-xl bg-white/5 text-slate-400 text-xs font-semibold hover:bg-white/10"
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">
-                  Publish Project
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold hover:bg-brand-600 disabled:opacity-50"
+                >
+                  {submitting ? 'Publishing...' : 'Publish Project'}
                 </button>
               </div>
             </form>

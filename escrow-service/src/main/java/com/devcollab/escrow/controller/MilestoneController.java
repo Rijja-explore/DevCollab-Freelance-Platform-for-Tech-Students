@@ -49,8 +49,8 @@ public class MilestoneController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "List all milestones (admin)")
+    @PreAuthorize("hasAnyRole('STARTUP', 'STUDENT', 'ADMIN')")
+    @Operation(summary = "List all milestones")
     public ResponseEntity<ApiResponse<PageResponse<MilestoneResponse>>> getAllMilestones(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {

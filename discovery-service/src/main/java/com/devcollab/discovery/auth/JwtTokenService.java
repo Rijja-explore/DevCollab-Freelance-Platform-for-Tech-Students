@@ -79,6 +79,10 @@ public class JwtTokenService {
                 .sign(algorithm);
     }
 
+    public com.auth0.jwt.interfaces.DecodedJWT verifyToken(String token) {
+        return JWT.require(algorithm).withIssuer(issuer).build().verify(token);
+    }
+
     public Map<String, Object> getJwks() {
         if (publicKey == null) return Map.of("keys", List.of());
 

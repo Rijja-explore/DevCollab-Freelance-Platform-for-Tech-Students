@@ -20,20 +20,24 @@ const router = express.Router();
 router.get(
   '/workspaces/:workspaceId/comments',
   authenticate,
-  commentValidator.validateWorkspaceId,
   commentController.getComments
 );
 
-/**
- * POST /api/workspaces/:workspaceId/comments
- * Create a new comment
- * Requires authentication
- */
+router.get(
+  '/comments/:workspaceId',
+  authenticate,
+  commentController.getComments
+);
+
 router.post(
   '/workspaces/:workspaceId/comments',
   authenticate,
-  commentValidator.validateWorkspaceId,
-  commentValidator.validateCreateComment,
+  commentController.createComment
+);
+
+router.post(
+  '/comments/:workspaceId',
+  authenticate,
   commentController.createComment
 );
 

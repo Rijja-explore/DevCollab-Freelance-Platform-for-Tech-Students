@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi';
 import { TableSkeleton } from '../components/LoadingSkeleton';
 import { format } from 'date-fns';
 import { Calendar, ShieldAlert, User } from 'lucide-react';
+import { ServiceHeader } from '../components/ServiceHeader';
 
 export const AuditLogs: React.FC = () => {
   const [page, setPage] = useState(0);
@@ -19,18 +20,17 @@ export const AuditLogs: React.FC = () => {
     fetchAuditLogs(page, 50, entityType);
   }, [page, entityType, fetchAuditLogs]);
 
-  const auditLogsList = auditData?.content ?? [];
-  const totalPages = auditData?.totalPages ?? 1;
+  const auditLogsList = auditData?.content ?? auditData?.data?.content ?? (Array.isArray(auditData) ? auditData : []);
+  const totalPages = auditData?.totalPages ?? auditData?.data?.totalPages ?? 1;
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="page-header">
-        <h1 className="page-title">Immutable Audit Trail</h1>
-        <p className="page-subtitle">
-          Cryptographically aligned, system-level event recording of matching events and fintech executions.
-        </p>
-      </div>
+      {/* Service 3 Escrow Banner */}
+      <ServiceHeader
+        service="escrow"
+        title="Immutable Audit Logs"
+        subtitle="Cryptographically verified event logs recording contract creation, milestone status updates, PayPal webhooks, and ledger transactions."
+      />
 
       {/* Filter and Search Bar */}
       <div className="card p-4 flex items-center gap-4">
