@@ -102,9 +102,10 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
       setBudget('')
       setSkillsInput('')
       loadProjects()
-    } catch (err) {
-      toast.error('Failed to create project')
-      console.error(err)
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to create project'
+      toast.error(errorMsg)
+      console.error('Project creation failed:', err)
     } finally {
       setSubmitting(false)
     }

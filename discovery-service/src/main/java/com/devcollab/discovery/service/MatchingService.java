@@ -7,8 +7,10 @@ import com.devcollab.discovery.entity.StudentProfile;
 import com.devcollab.discovery.repository.MatchRecordRepository;
 import com.devcollab.discovery.repository.ProjectRepository;
 import com.devcollab.discovery.repository.StudentProfileRepository;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -133,6 +135,8 @@ public class MatchingService {
 
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class ProjectRecommendation {
         private Project project;
         private Double matchScore;
@@ -141,6 +145,8 @@ public class MatchingService {
 
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class MatchResult {
         private String matchId;
         private String projectId;

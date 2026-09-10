@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Sparkles, ArrowRight, Lock, Mail, ShieldCheck, Zap, Users } from 'lucide-react'
 import { useAuth, UserRole } from '../contexts/AuthContext'
@@ -8,11 +8,17 @@ export const Login: React.FC = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login, quickLogin } = useAuth()
+  const { login, quickLogin, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard'
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(from, { replace: true })
+    }
+  }, [isAuthenticated, navigate, from])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

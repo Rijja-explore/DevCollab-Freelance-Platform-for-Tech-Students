@@ -2,7 +2,10 @@ package com.devcollab.discovery.controller;
 
 import com.devcollab.discovery.entity.Project;
 import com.devcollab.discovery.service.ProjectService;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -77,6 +80,9 @@ public class ProjectController {
     }
 
     @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class CreateProjectDto {
         private String startupId;
         private String title;

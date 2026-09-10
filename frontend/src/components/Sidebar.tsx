@@ -59,6 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           items: [
             { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview & metrics' },
             { to: '/projects', label: 'Discover Projects', icon: Search, desc: 'Search & matching' },
+            { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Skill-matched gigs' },
             { to: '/applications', label: 'My Applications', icon: Handshake, desc: 'Applied gigs & status' },
             { to: '/workspaces', label: 'My Collaborations', icon: FolderGit2, desc: 'Live chat & code review' },
             { to: '/contracts', label: 'My Contracts', icon: FileText, desc: 'Escrow agreements' },
@@ -83,6 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           items: [
             { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Hires & budget overview' },
             { to: '/projects', label: 'My Projects', icon: Briefcase, desc: 'Post & manage gigs' },
+            { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Skill-matched talent' },
             { to: '/talent', label: 'Find Talent', icon: Search, desc: 'Student developers' },
             { to: '/applicants', label: 'Applicants', icon: Users, desc: 'Review & match talent' },
             { to: '/workspaces', label: 'Collaborations', icon: FolderGit2, desc: 'Workspaces & code reviews' },
@@ -109,6 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         items: [
           { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'System telemetry' },
           { to: '/projects', label: 'Projects Catalog', icon: Search, desc: 'All projects' },
+          { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Matching algorithm' },
           { to: '/talent', label: 'Find Talent', icon: Search, desc: 'All students' },
           { to: '/applicants', label: 'Applicants', icon: Users, desc: 'All applications' },
           { to: '/workspaces', label: 'Workspaces', icon: FolderGit2, desc: 'Active rooms' },

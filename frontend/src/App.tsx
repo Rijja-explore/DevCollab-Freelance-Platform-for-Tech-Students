@@ -7,7 +7,6 @@ import { Layout } from './components/Layout'
 import { ToastProvider } from './components/ToastProvider'
 
 // Pages
-import { LandingPage } from './pages/LandingPage'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { ForgotPassword } from './pages/ForgotPassword'
@@ -38,8 +37,8 @@ const App: React.FC = () => {
   const content = (
     <Router>
       <Routes>
-        {/* Public Landing & Authentication */}
-        <Route path="/" element={<LandingPage />} />
+        {/* Authentication */}
+        <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -120,7 +119,7 @@ const App: React.FC = () => {
         <Route
           path="/recommendations"
           element={
-            <ProtectedRoute allowedRoles={['STUDENT', 'ADMIN']}>
+            <ProtectedRoute allowedRoles={['STUDENT', 'STARTUP', 'ADMIN']}>
               <Layout>
                 <Recommendations />
               </Layout>

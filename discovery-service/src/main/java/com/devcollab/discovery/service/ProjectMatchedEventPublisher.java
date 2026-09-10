@@ -1,8 +1,10 @@
 package com.devcollab.discovery.service;
 
 import com.devcollab.discovery.entity.Project;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -96,6 +98,8 @@ public class ProjectMatchedEventPublisher {
 
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class MilestonePayload {
         private String title;
         private String description;

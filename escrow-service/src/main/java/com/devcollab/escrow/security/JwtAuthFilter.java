@@ -53,10 +53,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 UUID userId;
                 try {
                     userId = UUID.fromString(subject);
-                } catch (IllegalArgumentException e) {
-                    log.warn("JWT subject is not a valid UUID: {}", subject);
-                    filterChain.doFilter(request, response);
-                    return;
+                } catch (Exception e) {
+                    userId = UUID.nameUUIDFromBytes(subject.getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 }
 
                 UserPrincipal principal = new UserPrincipal(userId, email, roles);
