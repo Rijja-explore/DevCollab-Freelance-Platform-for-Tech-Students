@@ -43,6 +43,8 @@ export const WorkspaceDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'chat' | 'code' | 'milestones'>('chat')
+  const [workspace, setWorkspace] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [comments, setComments] = useState<CodeComment[]>([])
@@ -54,6 +56,21 @@ export const WorkspaceDetail: React.FC = () => {
   const workspaceId = id || 'ws-default'
 
   useEffect(() => {
+    // 0. Fetch workspace details to get projectName
+    setLoading(true)
+    workspaceApi
+      .getById(workspaceId)
+      .then((res) => {
+        const ws = res.data?.data ?? res.data
+        setWorkspace(ws || {})
+      })
+      .catch(() => {
+        setWorkspace({})
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+
     // 1. Fetch initial messages
     workspaceApi
       .getMessages(workspaceId)
@@ -159,7 +176,7 @@ export const WorkspaceDetail: React.FC = () => {
     const commentPayload: CodeComment = {
       workspaceId,
       lineNumber: selectedLine || 1,
-      fileSnippet: 'src/services/PaymentService.ts:L' + (selectedLine || 1),
+      fileSnippet: selectedLine ? `Code Review Comment - Line ${selectedLine}` : 'Code Review Comment',
       content: newComment.trim(),
       authorName: user?.name || 'DevCollab Reviewer',
       createdAt: new Date().toISOString(),
@@ -216,7 +233,7 @@ export async function releaseMilestoneFunds(milestoneId: string) {
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-white tracking-tight">
-              Workspace #{workspaceId.substring(0, 8)}
+              {loading ? 'Loading...' : workspace?.projectName || 'Project Workspace'}
             </h1>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -381,9 +398,9 @@ export async function releaseMilestoneFunds(milestoneId: string) {
             <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4 font-sans">
               <div className="flex items-center gap-2 text-slate-400">
                 <FileCode className="w-4 h-4 text-brand-400" />
-                <span className="text-xs font-bold text-white">src/services/PaymentService.ts</span>
+                <span className="text-xs font-bold text-white">Code Review for Project</span>
               </div>
-              <span className="text-[10px] text-slate-500">Click line number to add comment</span>
+              <span className="text-[10px] text-slate-500">Click line to add review comment</span>
             </div>
 
             <div className="space-y-1">

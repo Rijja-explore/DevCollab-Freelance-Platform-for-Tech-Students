@@ -97,6 +97,18 @@ public class MilestoneController {
         String actor = principal != null ? principal.getEmail() : "system";
 
         MilestoneResponse response = milestoneService.releaseMilestone(id, key, actor);
+        if (response.getStatus() == com.devcollab.escrow.enums.MilestoneStatus.FAILED) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(ApiResponse.<MilestoneResponse>builder()
+                            .success(false)
+                            .message("Payment order creation failed. You can retry payment.")
+                            .error(ApiResponse.ErrorDetails.builder()
+                                    .code("PAYMENT_GATEWAY_ERROR")
+                                    .message("Payment order creation failed. Please retry payment.")
+                                    .build())
+                            .data(response)
+                            .build());
+        }
         return ResponseEntity.ok(ApiResponse.success(response, "Payment release initiated"));
     }
 }

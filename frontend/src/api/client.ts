@@ -57,6 +57,10 @@ export const discoveryApi = {
     client.get(`/api/projects/${id}`),
   createProject: (data: unknown) =>
     client.post('/api/projects', data),
+  updateProject: (id: string, data: unknown) =>
+    client.put(`/api/projects/${id}`, data),
+  deleteProject: (id: string) =>
+    client.delete(`/api/projects/${id}`),
   search: (q?: string, skills?: string[], category?: string) => {
     const params = new URLSearchParams()
     if (q) params.append('q', q)
@@ -66,6 +70,12 @@ export const discoveryApi = {
   },
   getRecommendations: (studentId: string) =>
     client.get(`/api/matches/recommendations/${studentId}`),
+  searchTalent: (skills?: string[], q?: string) => {
+    const params = new URLSearchParams()
+    if (q) params.append('q', q)
+    if (skills && skills.length) skills.forEach((s) => params.append('skills', s))
+    return client.get(`/api/profiles/students/search?${params}`)
+  },
   match: (projectId: string, studentId: string) =>
     client.post('/api/matches', { projectId, studentId }),
   getAllMatches: () =>

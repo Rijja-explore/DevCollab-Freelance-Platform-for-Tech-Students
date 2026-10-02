@@ -71,25 +71,33 @@ export const getWorkspaceByProjectId = async (req, res, next) => {
 export const getAllWorkspaces = async (req, res, next) => {
   try {
     const filter = {};
+    const userId = req.user?.id;
+    
     if (req.user && req.user.role !== 'admin' && req.user.role !== 'ADMIN') {
-      filter.userId = req.user.id;
+      filter.userId = userId;
+      logger.info(`[workspaceController] Fetching workspaces for user: ${userId} (role: ${req.user.role})`);
+    } else {
+      logger.info(`[workspaceController] Fetching all workspaces (admin user: ${userId})`);
     }
     
-    logger.info(`Getting all workspaces (user: ${req.user?.id || 'all'})`);
     const result = await workspaceService.getAllWorkspaces(filter);
     
     if (!result.success) {
+      logger.warn(`[workspaceController] Failed to retrieve workspaces: ${result.message}`);
       return res.status(result.statusCode || 500).json({
         success: false,
         message: result.message
       });
     }
     
+    logger.info(`[workspaceController] ✅ Successfully retrieved ${result.data?.length || 0} workspaces for user: ${userId}`);
+    
     res.json({
       success: true,
       data: result.data
     });
   } catch (error) {
+    logger.error(`[workspaceController] Error fetching workspaces:`, error);
     next(error);
   }
 };

@@ -5,23 +5,35 @@ import notificationClient from '../clients/notificationClient.js';
 
 const resolveWorkspace = async (workspaceId) => {
   let workspace = null;
+  
+  logger.debug(`Attempting to resolve workspace with ID: ${workspaceId}`);
+  
+  // First, try to find by MongoDB ObjectId
   if (mongoose.Types.ObjectId.isValid(workspaceId)) {
+    logger.debug(`ID is valid MongoDB ObjectId, searching by _id...`);
     workspace = await Workspace.findById(workspaceId);
+    if (workspace) {
+      logger.debug(`Found workspace by _id: ${workspace._id}`);
+      return workspace;
+    }
   }
-  if (!workspace) {
-    workspace = await Workspace.findOne({ projectId: workspaceId });
+  
+  // If not found by _id, try to find by projectId (string matching, case-insensitive)
+  logger.debug(`Searching for workspace by projectId (case-insensitive): ${workspaceId}`);
+  workspace = await Workspace.findOne({ projectId: workspaceId.toLowerCase ? workspaceId.toLowerCase() : workspaceId });
+  
+  if (workspace) {
+    logger.debug(`Found workspace by projectId: ${workspace._id}`);
+    return workspace;
   }
-  if (!workspace) {
-    workspace = new Workspace({
-      projectId: workspaceId,
-      startupId: 'startup-owner-1',
-      studentId: 'student-user-1',
-      title: `Workspace for Project ${workspaceId.slice(0, 8)}`,
-      status: 'ACTIVE'
-    });
-    await workspace.save();
-  }
-  return workspace;
+  
+  // Debug: log all available workspaces
+  const allWorkspaces = await Workspace.find().select('_id projectId studentId startupId');
+  logger.warn(`Workspace not found for ID: ${workspaceId}. Available workspaces: ${JSON.stringify(allWorkspaces.map(w => ({ id: w._id, projectId: w.projectId })))}`);
+  
+  // If still not found, throw error - do NOT auto-create
+  // Workspaces should only be created via RabbitMQ events
+  throw new Error(`Workspace not found for project: ${workspaceId}. Workspace must be created via RabbitMQ event first.`);
 };
 
 /**

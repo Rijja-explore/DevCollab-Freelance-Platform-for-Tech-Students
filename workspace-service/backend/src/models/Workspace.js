@@ -50,6 +50,15 @@ const workspaceSchema = new Schema({
     maxlength: [50, 'Startup ID cannot exceed 50 characters']
   },
 
+  // Project name for display purposes (denormalized from Discovery Service)
+  projectName: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: [255, 'Project name cannot exceed 255 characters'],
+    default: 'Project'
+  },
+
   // Workspace lifecycle status
   status: {
     type: String,

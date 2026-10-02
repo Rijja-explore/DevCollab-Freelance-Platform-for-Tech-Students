@@ -54,14 +54,14 @@ export const ProjectDetail: React.FC = () => {
       .finally(() => setLoading(false))
   }, [id])
 
-  const userSkills = user?.skills || ['React', 'TypeScript', 'Node.js']
+  const userSkills = user?.skills || []
   const matchedSkills = (project?.requiredSkills || []).filter((s) =>
     userSkills.some((us) => us.toLowerCase() === s.toLowerCase()),
   )
   const matchPercentage =
-    project && project.requiredSkills && project.requiredSkills.length > 0
+    project && project.requiredSkills && project.requiredSkills.length > 0 && userSkills.length > 0
       ? Math.round((matchedSkills.length / project.requiredSkills.length) * 100)
-      : 80
+      : null // Don't show default percentage - let backend calculate it
 
   const handleApplyMatch = async () => {
     if (!project) return
@@ -69,15 +69,15 @@ export const ProjectDetail: React.FC = () => {
     try {
       const studentId = user?.profileId || user?.id || 'student-user-1'
       await discoveryApi.match(project.id, studentId)
-      toast.success('Successfully matched! RabbitMQ project.matched event dispatched.')
+      toast.success('Successfully matched! RabbitMQ project.matched event dispatched. Workspace creation in progress...')
       setTimeout(() => {
         navigate('/workspaces')
-      }, 1000)
+      }, 3000) // Increased delay to allow workspace creation
     } catch {
       toast.success('Application submitted! Collaboration workspace activated.')
       setTimeout(() => {
         navigate('/workspaces')
-      }, 1000)
+      }, 3000) // Increased delay
     } finally {
       setMatching(false)
     }
@@ -143,6 +143,19 @@ export const ProjectDetail: React.FC = () => {
                 {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'Live on Platform'}
               </span>
             </div>
+            <div className="mt-2 text-[10px] text-slate-500 font-mono bg-white/5 p-2 rounded border border-white/10">
+              Project ID: {project.id}
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(project.id)
+                  toast.success('Project ID copied to clipboard')
+                }}
+                className="ml-2 px-2 py-1 text-xs bg-brand-500/20 hover:bg-brand-500/30 rounded border border-brand-500/30"
+              >
+                Copy
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col sm:items-end gap-1">
@@ -171,7 +184,7 @@ export const ProjectDetail: React.FC = () => {
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
               Required Tech Stack & Matching Breakdown
             </h3>
-            {role === 'STUDENT' && (
+            {role === 'STUDENT' && matchPercentage !== null && (
               <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-bold">
                 <Sparkles className="w-3.5 h-3.5" />
                 {matchPercentage}% Skill Match

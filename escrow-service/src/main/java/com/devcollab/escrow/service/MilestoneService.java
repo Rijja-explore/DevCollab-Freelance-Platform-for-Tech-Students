@@ -126,7 +126,8 @@ public class MilestoneService {
 
         if (milestone.getStatus() != MilestoneStatus.SUBMITTED &&
             milestone.getStatus() != MilestoneStatus.IN_PROGRESS &&
-            milestone.getStatus() != MilestoneStatus.PENDING) {
+            milestone.getStatus() != MilestoneStatus.PENDING &&
+            milestone.getStatus() != MilestoneStatus.FAILED) {
             throw new EscrowException(
                     String.format("Cannot approve milestone in status: %s", milestone.getStatus()),
                     HttpStatus.BAD_REQUEST, "INVALID_MILESTONE_STATUS");
@@ -135,7 +136,7 @@ public class MilestoneService {
         // Create idempotency key: milestoneId + approve to prevent double approval
         String idempotencyKey = "approve:" + milestoneId.toString();
 
-        if (milestoneRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
+        if (milestone.getStatus() != MilestoneStatus.FAILED && milestoneRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
             throw new DuplicateReleaseException(milestoneId.toString());
         }
 
@@ -175,13 +176,18 @@ public class MilestoneService {
     public MilestoneResponse releaseMilestone(UUID milestoneId, String idempotencyKey, String actor) {
         Milestone milestone = findMilestoneOrThrow(milestoneId);
 
-        // Check idempotency key in transaction repository — if present, return existing milestone state safely
+        // Check idempotency key in transaction repository — if present and successful/pending, return existing state safely
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             Optional<Transaction> existingTx = transactionRepository.findByIdempotencyKey(idempotencyKey);
             if (existingTx.isPresent()) {
-                log.info("Duplicate milestone release attempt with key {} for milestone {} — returning existing state",
-                        idempotencyKey, milestoneId);
-                return milestoneMapper.toResponse(milestone);
+                Transaction tx = existingTx.get();
+                if (tx.getStatus() == TransactionStatus.SUCCESS || tx.getStatus() == TransactionStatus.PENDING) {
+                    log.info("Duplicate milestone release attempt with key {} for milestone {} — returning existing state",
+                            idempotencyKey, milestoneId);
+                    return milestoneMapper.toResponse(milestone);
+                }
+                // Previous attempt failed, allow retrying by giving a fresh idempotency key
+                idempotencyKey = idempotencyKey + ":retry:" + System.currentTimeMillis();
             }
         } else {
             idempotencyKey = "release:" + milestoneId.toString();
@@ -197,7 +203,7 @@ public class MilestoneService {
                     HttpStatus.CONFLICT, "PAYMENT_IN_PROGRESS");
         }
 
-        if (milestone.getStatus() != MilestoneStatus.APPROVED) {
+        if (milestone.getStatus() != MilestoneStatus.APPROVED && milestone.getStatus() != MilestoneStatus.FAILED) {
             throw new EscrowException(
                     "Only APPROVED milestones can have payments released. Current status: " + milestone.getStatus(),
                     HttpStatus.BAD_REQUEST, "MILESTONE_NOT_APPROVED");

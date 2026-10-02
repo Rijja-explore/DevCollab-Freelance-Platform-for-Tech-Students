@@ -9,6 +9,8 @@ import {
   DollarSign,
   ArrowRight,
   X,
+  Edit3,
+  Trash2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
@@ -34,7 +36,10 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
   const { user, role } = useAuth()
   const [category, setCategory] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([])
+  const [skillInput, setSkillInput] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(defaultOpenModal)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [projectsList, setProjectsList] = useState<Project[]>([])
 
@@ -46,11 +51,23 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
   const [skillsInput, setSkillsInput] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  // Common skills for quick selection
+  const commonSkills = [
+    'React', 'Vue.js', 'Angular', 'Next.js', 'Svelte',
+    'Node.js', 'Python', 'Java', 'Go', 'Rust', 'PHP', 'Ruby',
+    'TypeScript', 'JavaScript', 'C#', 'C++',
+    'Django', 'FastAPI', 'Spring Boot', 'Flask', 'Express.js',
+    'PostgreSQL', 'MongoDB', 'MySQL', 'Redis', 'Firebase',
+    'Docker', 'Kubernetes', 'AWS', 'Azure', 'GCP',
+    'GraphQL', 'REST API', 'Microservices', 'WebSockets',
+    'Machine Learning', 'AI', 'TensorFlow', 'PyTorch',
+  ]
+
   const loadProjects = useCallback(async () => {
     setLoading(true)
     try {
-      if (searchQuery.trim()) {
-        const res = await discoveryApi.search(searchQuery.trim())
+      if (searchQuery.trim() || selectedSkills.length > 0) {
+        const res = await discoveryApi.search(searchQuery.trim() || undefined, selectedSkills.length > 0 ? selectedSkills : undefined, category === 'ALL' ? undefined : category)
         const data = res.data?.data ?? res.data ?? []
         setProjectsList(Array.isArray(data) ? data : [])
       } else {
@@ -65,11 +82,28 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
     } finally {
       setLoading(false)
     }
-  }, [category, searchQuery])
+  }, [category, searchQuery, selectedSkills])
 
   useEffect(() => {
     loadProjects()
   }, [loadProjects])
+
+  const handleAddSkill = (skill: string) => {
+    if (!selectedSkills.includes(skill)) {
+      setSelectedSkills([...selectedSkills, skill])
+    }
+  }
+
+  const handleRemoveSkill = (skill: string) => {
+    setSelectedSkills(selectedSkills.filter(s => s !== skill))
+  }
+
+  const handleCustomSkill = () => {
+    if (skillInput.trim() && !selectedSkills.includes(skillInput.trim())) {
+      setSelectedSkills([...selectedSkills, skillInput.trim()])
+      setSkillInput('')
+    }
+  }
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,30 +119,66 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
         .map((s) => s.trim())
         .filter(Boolean)
 
-      await discoveryApi.createProject({
-        startupId: user?.id || 'startup-owner-1',
-        title,
-        description,
-        category: formCategory,
-        budget: parseFloat(budget),
-        currency: 'USD',
-        requiredSkills: skills.length > 0 ? skills : ['React', 'TypeScript'],
-      })
+      if (editingProject) {
+        // Update existing project
+        await discoveryApi.updateProject(editingProject.id, {
+          title,
+          description,
+          category: formCategory,
+          budget: parseFloat(budget),
+          currency: 'USD',
+          requiredSkills: skills.length > 0 ? skills : ['React', 'TypeScript'],
+        })
+        toast.success('Project updated successfully!')
+        setEditingProject(null)
+      } else {
+        // Create new project
+        await discoveryApi.createProject({
+          startupId: user?.id || 'startup-owner-1',
+          title,
+          description,
+          category: formCategory,
+          budget: parseFloat(budget),
+          currency: 'USD',
+          requiredSkills: skills.length > 0 ? skills : ['React', 'TypeScript'],
+        })
+        toast.success('Project created and indexed in Elasticsearch!')
+      }
 
-      toast.success('Project created and indexed in Elasticsearch!')
       setShowCreateModal(false)
       setTitle('')
       setDescription('')
       setBudget('')
       setSkillsInput('')
+      setFormCategory('Web Development')
       loadProjects()
     } catch (err: any) {
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to create project'
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to save project'
       toast.error(errorMsg)
-      console.error('Project creation failed:', err)
+      console.error('Project operation failed:', err)
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project)
+    setTitle(project.title)
+    setDescription(project.description)
+    setFormCategory(project.category)
+    setBudget(project.budget.toString())
+    setSkillsInput(project.requiredSkills?.join(', ') || '')
+    setShowCreateModal(true)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingProject(null)
+    setShowCreateModal(false)
+    setTitle('')
+    setDescription('')
+    setBudget('')
+    setSkillsInput('')
+    setFormCategory('Web Development')
   }
 
   const categories = [
@@ -142,31 +212,108 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
       />
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="relative flex-1 w-full">
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <Search className="w-4 h-4" />
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="relative flex-1 w-full">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <Search className="w-4 h-4" />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search projects by title or description..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500 transition-all"
+            />
           </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search projects by title, description or tech stack (e.g. Next.js, FastAPI)..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500 transition-all"
-          />
+
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500 cursor-pointer"
+          >
+            {categories.map((c) => (
+              <option key={c} value={c} className="bg-slate-900 text-white">
+                {c === 'ALL' ? 'All Categories' : c}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500 cursor-pointer"
-        >
-          {categories.map((c) => (
-            <option key={c} value={c} className="bg-slate-900 text-white">
-              {c === 'ALL' ? 'All Categories' : c}
-            </option>
-          ))}
-        </select>
+        {/* Tech Stack Filtering */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filter by Tech Stack</label>
+            {selectedSkills.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedSkills([])}
+                className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+
+          {/* Selected Skills Display */}
+          {selectedSkills.length > 0 && (
+            <div className="flex flex-wrap gap-2 p-3 rounded-xl bg-white/5 border border-white/10">
+              {selectedSkills.map((skill) => (
+                <span
+                  key={skill}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-500/20 border border-brand-500/40 text-xs font-semibold text-brand-300"
+                >
+                  {skill}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSkill(skill)}
+                    className="ml-0.5 hover:text-brand-200"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Common Skills Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+            {commonSkills.map((skill) => (
+              <button
+                key={skill}
+                type="button"
+                onClick={() => handleAddSkill(skill)}
+                disabled={selectedSkills.includes(skill)}
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                  selectedSkills.includes(skill)
+                    ? 'bg-brand-500/30 border border-brand-500/60 text-brand-300 cursor-default'
+                    : 'bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 hover:text-slate-300'
+                }`}
+              >
+                {skill}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom Skill Input */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={skillInput}
+              onChange={(e) => setSkillInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleCustomSkill()}
+              placeholder="Add custom skill..."
+              className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
+            />
+            <button
+              type="button"
+              onClick={handleCustomSkill}
+              className="px-3 py-2 rounded-lg bg-brand-500/20 border border-brand-500/40 text-brand-300 text-xs font-semibold hover:bg-brand-500/30 transition-all"
+            >
+              Add
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Project Grid */}
@@ -226,28 +373,64 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
                   <span>{project.budget?.toLocaleString()} {project.currency || 'USD'}</span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => navigate(`/projects/${project.id}`)}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-brand-400 hover:text-white transition-colors"
-                >
-                  View Details <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Edit/Delete buttons for project owner (startup) */}
+                  {(role === 'STARTUP' || role === 'ADMIN') && project.startupId === user?.id && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleEditProject(project)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-400 hover:bg-blue-500/10 border border-blue-500/20 transition-all"
+                        title="Edit this project"
+                      >
+                        <Edit3 className="w-3 h-3" /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+                            try {
+                              await discoveryApi.deleteProject(project.id)
+                              toast.success('Project deleted successfully')
+                              loadProjects()
+                            } catch (err: any) {
+                              toast.error(err.response?.data?.message || 'Failed to delete project')
+                            }
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-500/10 border border-red-500/20 transition-all"
+                        title="Delete this project"
+                      >
+                        <Trash2 className="w-3 h-3" /> Delete
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/projects/${project.id}`)}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-brand-400 hover:text-white transition-colors"
+                  >
+                    View Details <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Post Project Modal */}
+      {/* Post/Edit Project Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="max-w-lg w-full p-6 rounded-3xl bg-slate-900 border border-white/10 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-base font-bold text-white">Post New Project</h3>
+              <h3 className="text-base font-bold text-white">
+                {editingProject ? 'Edit Project' : 'Post New Project'}
+              </h3>
               <button
                 type="button"
-                onClick={() => setShowCreateModal(false)}
+                onClick={handleCancelEdit}
                 className="text-slate-400 hover:text-white"
               >
                 <X className="w-5 h-5" />
@@ -320,7 +503,7 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
               <div className="pt-3 border-t border-white/10 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={handleCancelEdit}
                   className="px-4 py-2 rounded-xl bg-white/5 text-slate-400 text-xs font-semibold hover:bg-white/10"
                 >
                   Cancel
@@ -330,7 +513,7 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
                   disabled={submitting}
                   className="px-5 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold hover:bg-brand-600 disabled:opacity-50"
                 >
-                  {submitting ? 'Publishing...' : 'Publish Project'}
+                  {submitting ? (editingProject ? 'Updating...' : 'Publishing...') : (editingProject ? 'Update Project' : 'Publish Project')}
                 </button>
               </div>
             </form>

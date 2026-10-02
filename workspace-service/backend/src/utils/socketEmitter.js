@@ -53,8 +53,10 @@ class SocketEmitter {
     }
 
     const room = this.getWorkspaceRoom(workspaceId);
+    // Emit to all sockets in room, INCLUDING sender
     this.io.to(room).emit('message-created', message);
-    logger.debug(`Emitted message-created to room ${room}`);
+    this.io.to(room).emit('new-message', message);
+    logger.debug(`Emitted message-created and new-message to room ${room}`);
   }
 
   /**
@@ -101,8 +103,10 @@ class SocketEmitter {
     }
 
     const room = this.getWorkspaceRoom(workspaceId);
+    // Emit to all sockets in room, INCLUDING sender
     this.io.to(room).emit('comment-created', comment);
-    logger.debug(`Emitted comment-created to room ${room}`);
+    this.io.to(room).emit('new-comment', comment);
+    logger.debug(`Emitted comment-created and new-comment to room ${room}`);
   }
 
   /**

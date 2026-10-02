@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { discoveryApi } from '../api/client'
+import { discoveryApi, workspaceApi } from '../api/client'
 import { useApi } from '../hooks/useApi'
 import { TableSkeleton } from '../components/LoadingSkeleton'
 import { EmptyState } from '../components/EmptyState'
@@ -27,7 +27,6 @@ interface Recommendation {
 export const Recommendations: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const studentId = user?.profileId || user?.id || 'demo-student-id'
   const [matchingId, setMatchingId] = useState<string | null>(null)
 
   const {
@@ -37,24 +36,96 @@ export const Recommendations: React.FC = () => {
   } = useApi<any, [string]>(discoveryApi.getRecommendations)
 
   useEffect(() => {
-    fetchRecommendations(studentId)
-  }, [fetchRecommendations, studentId])
+    if (user && user.role === 'STUDENT') {
+      // Get actual student ID from user context
+      const actualStudentId = user?.profileId || user?.id
+      if (actualStudentId) {
+        fetchRecommendations(actualStudentId)
+      }
+    }
+  }, [user, fetchRecommendations])
 
   const recommendations: Recommendation[] = recsData?.data ?? (Array.isArray(recsData) ? recsData : [])
 
   const handleMatch = async (projectId: string) => {
     setMatchingId(projectId)
     try {
-      const res = await discoveryApi.match(projectId, studentId)
+      const actualStudentId = user?.profileId || user?.id
+      if (!actualStudentId) {
+        toast.error('User profile not loaded')
+        setMatchingId(null)
+        return
+      }
+      const res = await discoveryApi.match(projectId, actualStudentId)
       toast.success(res.data?.data?.message ?? 'Match confirmed! Workspace and Escrow initialized.')
-      fetchRecommendations(studentId)
+      // Refetch recommendations after match
+      fetchRecommendations(actualStudentId)
+      
+      // Wait for workspace to be created via RabbitMQ
+      // Poll the workspace API until the new workspace appears
+      let workspaceCreated = false
+      let attempts = 0
+      const maxAttempts = 15 // 15 * 1 second = 15 seconds max wait
+      
+      console.log('Waiting for workspace creation from RabbitMQ...')
+      
+      while (!workspaceCreated && attempts < maxAttempts) {
+        attempts++
+        await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second between checks
+        
+        try {
+          const workspacesRes = await workspaceApi.getAll()
+          const workspaces = workspacesRes.data?.data ?? workspacesRes.data ?? []
+          
+          // Check if new workspace was created for this project
+          const newWorkspace = Array.isArray(workspaces) && workspaces.find(
+            (ws: any) => ws.projectId === projectId || ws.projectId?.toLowerCase() === projectId.toLowerCase()
+          )
+          
+          if (newWorkspace) {
+            console.log('Workspace created successfully after', attempts, 'attempts')
+            workspaceCreated = true
+            toast.success('Workspace ready! Redirecting...')
+          }
+        } catch (err) {
+          console.error('Error checking for workspace:', err)
+        }
+      }
+      
+      if (!workspaceCreated) {
+        console.warn('Workspace not created after max attempts, navigating anyway')
+        toast('Workspace creation is taking longer than expected. It may appear shortly.', {
+  icon: '⚠️',
+})
+
+      }
+      
+      // Navigate to workspaces
       navigate('/workspaces')
     } catch (err: any) {
       console.error(err)
-      toast.error('Matching failed')
+      toast.error(err.response?.data?.error || 'Matching failed')
     } finally {
       setMatchingId(null)
     }
+  }
+
+  if (user?.role !== 'STUDENT') {
+    return (
+      <div className="space-y-6">
+        <ServiceHeader
+          service="discovery"
+          title="AI-Powered Skill Matches"
+          subtitle="This page is only available for students."
+        />
+        <EmptyState
+          title="Not Authorized"
+          description="Only students can view project recommendations. Log in as a student to see AI-matched projects."
+          actionText="Browse All Projects"
+          onAction={() => navigate('/projects')}
+        />
+      </div>
+    )
   }
 
   return (
@@ -72,7 +143,7 @@ export const Recommendations: React.FC = () => {
       ) : recommendations.length === 0 ? (
         <EmptyState
           title="No recommendations currently available"
-          description="Projects matching your skill matrix will appear here automatically as startups post new opportunities."
+          description="Projects matching your skill matrix will appear here automatically as startups post new opportunities. Make sure you've added skills to your profile."
           actionText="Browse Open Projects"
           onAction={() => navigate('/projects')}
         />
@@ -87,7 +158,7 @@ export const Recommendations: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
-                    {rec.matchScore ? Math.round(rec.matchScore * 100) : 85}% Skill Match
+                    {rec.matchScore !== undefined && rec.matchScore !== null ? Math.round(rec.matchScore) : 0}% Skill Match
                   </span>
                   <span className="text-xs font-semibold text-slate-400">{rec.project.category}</span>
                 </div>

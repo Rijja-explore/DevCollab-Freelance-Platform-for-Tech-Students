@@ -131,6 +131,10 @@ export const Milestones: React.FC = () => {
   const [page, setPage] = useState(0);
   const [selectedContract, setSelectedContract] = useState<any>(null);
   const [paypalOrder, setPaypalOrder] = useState<any>(null);
+  const [editingMilestone, setEditingMilestone] = useState<any>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
 
   const {
     data: milestonesData,
@@ -141,14 +145,25 @@ export const Milestones: React.FC = () => {
   const { execute: approveMilestone, loading: approving } = useApi<any, [string]>(
     milestonesApi.approve,
     {
-      successMessage: 'Milestone approved. Payment order can now be released.',
+      successMessage: 'Milestone approved. You can now fund this milestone via PayPal.',
     }
   );
 
   const { execute: releaseMilestone, loading: releasing } = useApi<any, [string]>(
     milestonesApi.release,
     {
-      successMessage: 'Payment order created.',
+      successMessage: 'PayPal payment order created. Complete the checkout to release funds to student.',
+    }
+  );
+
+  const { execute: updateMilestone, loading: updating } = useApi<any, [string, any]>(
+    milestonesApi.update,
+    {
+      successMessage: 'Milestone updated successfully.',
+      onSuccess: () => {
+        setEditingMilestone(null);
+        fetchMilestones(page);
+      },
     }
   );
 
@@ -164,41 +179,83 @@ export const Milestones: React.FC = () => {
   const capturePayment = async (transactionId: string) => {
     try {
       await transactionsApi.capture(transactionId);
-      toast.success('Payment captured and escrow released.');
+      toast.success('Payment captured! Funds have been released to the student.');
       setPaypalOrder(null);
       fetchMilestones(page);
     } catch (err) {
       console.error(err);
-      toast.error('The payment could not be captured. Its status was not marked successful.');
+      toast.error('Payment capture failed. Please check PayPal Sandbox or try again.');
     }
   };
 
   const handlePay = async (milestoneId: string, amount: number, contractTitle: string) => {
     try {
+      console.log(`[handlePay] Starting payment for milestone: ${milestoneId}, amount: ${amount}, title: ${contractTitle}`)
+      
       const milestoneRes = await releaseMilestone(milestoneId);
       const milestoneData = milestoneRes?.data ?? milestoneRes;
 
+      console.log('[handlePay] Milestone release response:', milestoneData);
+
       let orderId = milestoneData?.providerOrderId;
       let transactionId = milestoneData?.transactionId;
+      
+      console.log(`[handlePay] Got orderId: ${orderId}, transactionId: ${transactionId}`)
+      
       if (!orderId || !transactionId) {
-        const txs = await transactionsApi.getAll(0, 50);
-        const all = txs.data?.data?.content ?? txs.data?.content ?? [];
-        const tx = all
-          .filter((t: any) => t.milestoneId === milestoneId)
-          .sort((a: any, b: any) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )[0];
-        orderId = tx?.providerOrderId;
-        transactionId = tx?.id;
+        console.log('[handlePay] Order or transaction ID missing, fetching from transactions API...');
+        try {
+          const txs = await transactionsApi.getAll(0, 50);
+          const all = txs.data?.data?.content ?? txs.data?.content ?? txs.data?.data ?? [];
+          console.log(`[handlePay] Found ${all.length} transactions, filtering for milestoneId: ${milestoneId}`)
+          
+          const tx = all
+            .filter((t: any) => t.milestoneId === milestoneId)
+            .sort((a: any, b: any) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            )[0];
+          
+          if (tx) {
+            orderId = tx?.providerOrderId;
+            transactionId = tx?.id;
+            console.log('[handlePay] Retrieved transaction:', tx);
+          } else {
+            console.warn('[handlePay] No transaction found for this milestone')
+          }
+        } catch (txErr) {
+          console.error('[handlePay] Error fetching transactions:', txErr)
+        }
       }
 
       if (!orderId || !transactionId) {
-        throw new Error('Payment order was created but its transaction could not be retrieved');
+        // Order creation succeeded but we couldn't retrieve the IDs
+        // This might be a timing issue, so just warn and don't block the UI
+        console.warn(`[handlePay] Could not retrieve orderId or transactionId - order may have been created but details not yet available`);
+        toast('Payment order created but details loading. Please wait a moment...', { icon: '⏳' });
+        
+        // Try again after a delay
+        setTimeout(() => {
+          handlePay(milestoneId, amount, contractTitle);
+        }, 2000);
+        return;
       }
 
-      const approveUrl = milestoneData?.approveUrl || milestoneData?.data?.approveUrl;
+      let approveUrl = milestoneData?.approveUrl || milestoneData?.data?.approveUrl;
+      
+      console.log(`[handlePay] Setting PayPal order with orderId: ${orderId}, transactionId: ${transactionId}, approveUrl: ${!!approveUrl}`)
+      
+      // Add cancel and return URLs with milestone info for retry functionality
+      if (approveUrl) {
+        const cancelUrl = `/payment-cancel?milestoneId=${milestoneId}&title=${encodeURIComponent(contractTitle)}&amount=${amount}`;
+        const returnUrl = `/payment-success?transactionId=${transactionId}&milestoneId=${milestoneId}`;
+        
+        // Update URLs in approveUrl if needed
+        approveUrl = approveUrl
+          .replace(/CANCEL_URL[^&]*/g, `CANCEL_URL=${encodeURIComponent(cancelUrl)}`)
+          .replace(/RETURN_URL[^&]*/g, `RETURN_URL=${encodeURIComponent(returnUrl)}`);
+      }
 
-      toast.success('Payment order created. Opening checkout...');
+      // Set the order to open the modal
       setPaypalOrder({
         orderId,
         transactionId,
@@ -207,9 +264,13 @@ export const Milestones: React.FC = () => {
         title: contractTitle,
         approveUrl,
       });
+      
+      console.log('[handlePay] PayPal order set, modal should open')
     } catch (err: any) {
-      console.error(err);
-      toast.error('Failed to trigger payment checkout flow');
+      console.error('[handlePay] Payment checkout error:', err);
+      const errorMessage = err.message || 'Failed to trigger payment checkout flow';
+      toast.error(errorMessage);
+      setPaypalOrder(null);
     }
   };
 
@@ -232,7 +293,7 @@ export const Milestones: React.FC = () => {
       <ServiceHeader
         service="escrow"
         title="Escrow Milestones & PayPal Checkout"
-        subtitle="Track project deliverables, initiate PayPal sandbox order authorizations, and capture milestone disbursements."
+        subtitle="Track project deliverables, initiate PayPal sandbox order authorizations, and capture milestone disbursements. Students are notified automatically when payments are released."
       />
 
       {selectedContract && (
@@ -246,6 +307,33 @@ export const Milestones: React.FC = () => {
           </Link>
         </div>
       )}
+
+      {/* Payment Status Guide */}
+      <div className="card p-4 border border-emerald-500/20 bg-emerald-500/5">
+        <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">Payment Status Guide</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
+          <div className="p-2 rounded bg-white/5">
+            <div className="font-semibold text-slate-300">PENDING</div>
+            <div className="text-slate-500 text-[10px]">Milestone created, waiting for approval</div>
+          </div>
+          <div className="p-2 rounded bg-white/5">
+            <div className="font-semibold text-amber-300">APPROVED</div>
+            <div className="text-slate-500 text-[10px]">Ready for payment, startup can fund</div>
+          </div>
+          <div className="p-2 rounded bg-white/5">
+            <div className="font-semibold text-blue-300">PAYMENT_PROCESSING</div>
+            <div className="text-slate-500 text-[10px]">Payment initiated, processing via PayPal</div>
+          </div>
+          <div className="p-2 rounded bg-white/5">
+            <div className="font-semibold text-emerald-300">RELEASED</div>
+            <div className="text-slate-500 text-[10px]">Payment completed, funds released to student</div>
+          </div>
+        </div>
+        <p className="text-[10px] text-slate-500 mt-2">
+          Students receive automatic notifications when payments reach RELEASED status.
+          Check the <Link to="/transactions" className="text-brand-400 hover:underline">Transactions</Link> page for payment history.
+        </p>
+      </div>
 
       {/* Main Table */}
       {loading ? (
@@ -297,6 +385,21 @@ export const Milestones: React.FC = () => {
                     </td>
                     <td className="table-cell">
                       <StatusBadge status={milestone.status} />
+                      {milestone.status === 'RELEASED' && (
+                        <div className="text-[9px] text-emerald-400 mt-1">
+                          ✓ Payment released to student
+                        </div>
+                      )}
+                      {milestone.status === 'PAYMENT_PROCESSING' && (
+                        <div className="text-[9px] text-amber-400 mt-1">
+                          ⏳ Payment being processed
+                        </div>
+                      )}
+                      {milestone.status === 'FAILED' && (
+                        <div className="text-[9px] text-red-400 mt-1">
+                          ❌ Payment failed — Click Retry
+                        </div>
+                      )}
                     </td>
                     <td className="table-cell text-slate-400 text-xs">
                       {milestone.dueDate ? (
@@ -312,24 +415,45 @@ export const Milestones: React.FC = () => {
                       <div className="flex items-center justify-end gap-2">
                         {(role === 'STARTUP' || role === 'ADMIN') ? (
                           <>
+                            {/* Edit button - only for PENDING/IN_PROGRESS milestones */}
+                            {(milestone.status === 'PENDING' || milestone.status === 'IN_PROGRESS') && (
+                              <button
+                                onClick={() => {
+                                  setEditingMilestone(milestone);
+                                  setEditTitle(milestone.title);
+                                  setEditDescription(milestone.description);
+                                  setEditDueDate(milestone.dueDate ? new Date(milestone.dueDate).toISOString().split('T')[0] : '');
+                                }}
+                                className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-medium border border-white/10"
+                                title="Edit milestone"
+                              >
+                                Edit
+                              </button>
+                            )}
+                            
                             {(milestone.status === 'PENDING' || milestone.status === 'SUBMITTED' || milestone.status === 'IN_PROGRESS') && (
                               <button
                                 onClick={async () => {
                                   try {
+                                    console.log('[Approve & Fund] Starting...')
                                     await handleApprove(milestone.id);
+                                    console.log('[Approve & Fund] Milestone approved, now calling handlePay...')
+                                    // Wait a small moment for the approve to fully complete
+                                    await new Promise(resolve => setTimeout(resolve, 500));
                                     await handlePay(milestone.id, milestone.amount, milestone.title);
                                   } catch (err) {
-                                    handlePay(milestone.id, milestone.amount, milestone.title);
+                                    console.error('[Approve & Fund] Error during approve flow:', err);
+                                    toast.error('Failed to approve milestone. Please try again.');
                                   }
                                 }}
                                 disabled={approving || releasing}
                                 className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#ffc439] to-[#f4b628] hover:brightness-105 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/10 flex items-center gap-1.5 transition-all"
                               >
                                 <Play className="w-3 h-3 fill-current" />
-                                Fund via PayPal
+                                Approve & Fund via PayPal
                               </button>
                             )}
-                            {milestone.status === 'APPROVED' && (
+                            {(milestone.status === 'APPROVED' || milestone.status === 'FAILED') && (
                               <button
                                 onClick={() =>
                                   handlePay(
@@ -339,10 +463,14 @@ export const Milestones: React.FC = () => {
                                   )
                                 }
                                 disabled={releasing}
-                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold text-xs shadow-md shadow-emerald-500/10 flex items-center gap-1.5 transition-all"
+                                className={`px-3 py-1.5 rounded-xl font-bold text-xs shadow-md flex items-center gap-1.5 transition-all text-white ${
+                                  milestone.status === 'FAILED'
+                                    ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-500/20'
+                                    : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-emerald-500/10'
+                                }`}
                               >
                                 <Play className="w-3 h-3 fill-current" />
-                                Pay Release (PayPal)
+                                {milestone.status === 'FAILED' ? 'Retry Payment Release' : 'Release Payment via PayPal'}
                               </button>
                             )}
                             {milestone.status === 'RELEASED' && (
@@ -406,6 +534,93 @@ export const Milestones: React.FC = () => {
           onClose={() => setPaypalOrder(null)}
           onCapture={capturePayment}
         />
+      )}
+
+      {/* Edit Milestone Modal */}
+      {editingMilestone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="card w-full max-w-md p-6 relative">
+            <button
+              onClick={() => setEditingMilestone(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-lg font-bold text-white">Edit Milestone</h3>
+            <p className="text-sm text-slate-400 mt-1">
+              Update milestone details (Sequence #{editingMilestone.sequenceOrder})
+            </p>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!editTitle.trim()) {
+                toast.error('Title is required');
+                return;
+              }
+              updateMilestone(editingMilestone.id, {
+                title: editTitle,
+                description: editDescription,
+                dueDate: editDueDate || undefined
+              });
+            }} className="mt-6 space-y-4">
+              <div>
+                <label className="label">Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="input"
+                  placeholder="Milestone title"
+                />
+              </div>
+
+              <div>
+                <label className="label">Description</label>
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={3}
+                  className="input py-2"
+                  placeholder="Milestone description"
+                />
+              </div>
+
+              <div>
+                <label className="label">Due Date</label>
+                <input
+                  type="date"
+                  value={editDueDate}
+                  onChange={(e) => setEditDueDate(e.target.value)}
+                  className="input"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Optional: Set a future due date for this milestone
+                </p>
+              </div>
+
+              <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingMilestone(null)}
+                  className="btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updating}
+                  className="btn-primary"
+                >
+                  {updating ? 'Updating...' : 'Update Milestone'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

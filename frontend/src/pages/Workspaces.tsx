@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { workspaceApi } from '../api/client'
 import {
   MessageSquare,
@@ -17,6 +18,7 @@ interface Workspace {
   id: string
   _id?: string
   projectId: string
+  projectName?: string
   title?: string
   name?: string
   startupId: string
@@ -48,6 +50,7 @@ interface Comment {
 
 export const Workspaces: React.FC = () => {
   const { user, role } = useAuth()
+  const navigate = useNavigate()
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -62,24 +65,45 @@ export const Workspaces: React.FC = () => {
 
   // Fetch workspaces from MongoDB via Workspace Service
   useEffect(() => {
-    setLoading(true)
-    workspaceApi
-      .getAll()
-      .then((res) => {
+    let isMounted = true
+    const fetchWorkspaces = async (isInitial = false) => {
+      if (isInitial) setLoading(true)
+      try {
+        const res = await workspaceApi.getAll()
         const data = res.data?.data ?? res.data ?? []
+        if (!isMounted) return
         if (Array.isArray(data) && data.length > 0) {
           setWorkspaces(data)
-          setSelectedWorkspace(data[0])
+          setSelectedWorkspace((prev) => prev ?? data[0])
         } else {
           setWorkspaces([])
-          setSelectedWorkspace(null)
+          setSelectedWorkspace((prev) => prev ?? null)
         }
-      })
-      .catch((err) => {
+      } catch (err) {
+        if (!isMounted) return
         console.error('Error fetching workspaces:', err)
-        setWorkspaces([])
-      })
-      .finally(() => setLoading(false))
+        if (isInitial) {
+          toast.error('Failed to load workspaces')
+        }
+      } finally {
+        if (isMounted && isInitial) {
+          setLoading(false)
+        }
+      }
+    }
+
+    // Initial fetch
+    fetchWorkspaces(true)
+
+    // Poll every 5 seconds to catch newly created workspaces without spamming
+    const interval = setInterval(() => {
+      fetchWorkspaces(false)
+    }, 5000)
+
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+    }
   }, [])
 
   // Connect Socket.io when workspace changes
@@ -87,65 +111,172 @@ export const Workspaces: React.FC = () => {
     if (!selectedWorkspace) return
 
     const wsId = selectedWorkspace.id || selectedWorkspace._id || 'default'
+    
+    // Flag to track if this effect is the active one
+    let isActiveEffect = true
 
     // Fetch messages for active workspace
-    workspaceApi.getMessages(wsId).then((res) => {
-      const msgs = res.data?.data ?? res.data ?? []
-      setMessages(Array.isArray(msgs) ? msgs : [])
-    }).catch(() => setMessages([]))
+    const fetchWorkspaceData = async () => {
+      try {
+        console.log(`Fetching messages and comments for workspace: ${wsId}`)
+        const [messagesRes, commentsRes] = await Promise.all([
+          workspaceApi.getMessages(wsId),
+          workspaceApi.getComments(wsId)
+        ])
 
-    // Fetch comments
-    workspaceApi.getComments(wsId).then((res) => {
-      const cmts = res.data?.data ?? res.data ?? []
-      setComments(Array.isArray(cmts) ? cmts : [])
-    }).catch(() => setComments([]))
+        // Only update if this effect is still active (user didn't switch workspaces)
+        if (!isActiveEffect) return
+
+        const msgs = messagesRes.data?.data ?? messagesRes.data ?? []
+        const cmts = commentsRes.data?.data ?? commentsRes.data ?? []
+
+        const normalizedMsgs = (Array.isArray(msgs) ? msgs : []).map((m: any) => ({
+          ...m,
+          id: m.id || m._id,
+          content: m.content || m.text || '',
+          senderId: m.senderId || 'unknown',
+          senderName: m.senderName || (m.senderId === user?.id ? (user?.name || 'You') : 'Collaborator'),
+          createdAt: m.createdAt || new Date().toISOString()
+        }))
+
+        const normalizedCmts = (Array.isArray(cmts) ? cmts : []).map((c: any) => ({
+          ...c,
+          id: c.id || c._id,
+          content: c.content || c.text || '',
+          lineNumber: c.lineNumber,
+          fileSnippet: c.fileSnippet || c.fileRef,
+          createdAt: c.createdAt || new Date().toISOString()
+        }))
+        
+        console.log(`Successfully fetched ${normalizedMsgs.length} messages and ${normalizedCmts.length} comments for workspace ${wsId}`)
+        
+        setMessages(normalizedMsgs)
+        setComments(normalizedCmts)
+      } catch (err: any) {
+        console.error('Failed to fetch workspace data:', err)
+      }
+    }
+
+    fetchWorkspaceData()
 
     const token = localStorage.getItem('devcollab_token') || ''
+    let socket: Socket | null = null
+    
     try {
-      const socket = io('http://localhost:5000', {
+      // Connect to same origin via Vite/Nginx reverse proxy or fallback
+      const socketUrl = window.location.port === '5173' || window.location.port === '80' || !window.location.port
+        ? '/'
+        : 'http://localhost:5000'
+
+      socket = io(socketUrl, {
+        path: '/socket.io',
         transports: ['websocket', 'polling'],
         auth: { token },
         extraHeaders: {
           Authorization: `Bearer ${token}`,
         },
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 5
       })
       socketRef.current = socket
 
       socket.emit('join-workspace', { workspaceId: wsId })
 
-      socket.on('new-message', (msg: Message) => {
-        setMessages((prev) => {
-          if (prev.some((m) => m.content === msg.content && m.senderId === msg.senderId && Math.abs(new Date(m.createdAt || 0).getTime() - new Date(msg.createdAt || 0).getTime()) < 3000)) {
-            return prev
+      socket.on('connect_error', (error: any) => {
+        console.error('Socket connection error:', error)
+      })
+
+      // Helper function to deduplicate messages
+      const isDuplicate = (newMsg: any, existingMsgs: any[]): boolean => {
+        const newId = newMsg.id || newMsg._id
+        const newText = newMsg.content || newMsg.text
+        return existingMsgs.some((m) => {
+          const mId = m.id || m._id
+          if (mId && newId && mId === newId) return true
+          const mText = m.content || m.text
+          if (mText === newText && m.senderId === newMsg.senderId && m.createdAt && newMsg.createdAt) {
+            const timeDiff = Math.abs(
+              new Date(m.createdAt).getTime() - new Date(newMsg.createdAt).getTime()
+            )
+            return timeDiff < 2000
           }
-          return [...prev, msg]
+          return false
+        })
+      }
+
+      socket.on('new-message', (msg: any) => {
+        if (!isActiveEffect) return
+        const normalized = {
+          ...msg,
+          id: msg.id || msg._id,
+          content: msg.content || msg.text || '',
+          senderName: msg.senderName || (msg.senderId === user?.id ? (user?.name || 'You') : 'Collaborator'),
+        }
+        setMessages((prev) => {
+          if (isDuplicate(normalized, prev)) return prev
+          return [...prev, normalized]
         })
       })
 
-      socket.on('message-created', (msg: Message) => {
+      socket.on('message-created', (msg: any) => {
+        if (!isActiveEffect) return
+        const normalized = {
+          ...msg,
+          id: msg.id || msg._id,
+          content: msg.content || msg.text || '',
+          senderName: msg.senderName || (msg.senderId === user?.id ? (user?.name || 'You') : 'Collaborator'),
+        }
         setMessages((prev) => {
-          if (prev.some((m) => m.content === msg.content && m.senderId === msg.senderId && Math.abs(new Date(m.createdAt || 0).getTime() - new Date(msg.createdAt || 0).getTime()) < 3000)) {
-            return prev
-          }
-          return [...prev, msg]
+          if (isDuplicate(normalized, prev)) return prev
+          return [...prev, normalized]
         })
       })
 
-      socket.on('new-comment', (cmt: Comment) => {
-        setComments((prev) => [...prev, cmt])
+      socket.on('new-comment', (cmt: any) => {
+        if (!isActiveEffect) return
+        const normalized = {
+          ...cmt,
+          id: cmt.id || cmt._id,
+          content: cmt.content || cmt.text || '',
+        }
+        setComments((prev) => {
+          const exists = prev.some((c: any) => (c.id || c._id) === (normalized.id || normalized._id))
+          if (exists) return prev
+          return [...prev, normalized]
+        })
       })
 
-      socket.on('comment-created', (cmt: Comment) => {
-        setComments((prev) => [...prev, cmt])
+      socket.on('comment-created', (cmt: any) => {
+        if (!isActiveEffect) return
+        const normalized = {
+          ...cmt,
+          id: cmt.id || cmt._id,
+          content: cmt.content || cmt.text || '',
+        }
+        setComments((prev) => {
+          const exists = prev.some((c: any) => (c.id || c._id) === (normalized.id || normalized._id))
+          if (exists) return prev
+          return [...prev, normalized]
+        })
       })
 
-      return () => {
+      socket.on('disconnect', (reason: string) => {
+        console.log('Disconnected from workspace:', wsId, 'Reason:', reason)
+      })
+    } catch (err) {
+      console.error('Failed to create Socket.io connection:', err)
+    }
+
+    return () => {
+      isActiveEffect = false
+      if (socket) {
+        socket.emit('leave-workspace', { workspaceId: wsId })
         socket.disconnect()
       }
-    } catch {
-      // offline fallback
     }
-  }, [selectedWorkspace])
+  }, [selectedWorkspace, user?.id, user?.name])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -164,14 +295,46 @@ export const Workspaces: React.FC = () => {
     }
 
     try {
-      await workspaceApi.sendMessage(wsId, msgPayload.content, msgPayload.senderId, msgPayload.senderName)
-      socketRef.current?.emit('send-message', { ...msgPayload, workspaceId: wsId })
-      setMessages((prev) => [...prev, msgPayload])
+      const res = await workspaceApi.sendMessage(wsId, msgPayload.content, msgPayload.senderId, msgPayload.senderName)
+      
+      // Use the response data if available, otherwise use the payload
+      const sentMsg = res.data?.data || msgPayload
+      
+      // Emit to socket only after successful HTTP POST
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('send-message', { ...sentMsg, workspaceId: wsId })
+      }
+      
+      // Add message to state - may be duplicated by Socket.io but will be deduped
+      setMessages((prev) => {
+        if (isDuplicate(sentMsg, prev)) return prev
+        return [...prev, sentMsg]
+      })
+      
       setInputMessage('')
-    } catch {
-      setMessages((prev) => [...prev, msgPayload])
-      setInputMessage('')
+      console.log('Message sent successfully:', sentMsg)
+    } catch (error) {
+      console.error('Error sending message:', error)
+      toast.error('Failed to send message')
+      // Keep the input text in case user wants to retry
     }
+  }
+
+  const isDuplicate = (newMsg: Message, existingMsgs: Message[]): boolean => {
+    return existingMsgs.some((m) => {
+      // Match by ID first (most reliable)
+      if (m._id && newMsg._id && m._id === newMsg._id) return true
+      // Fallback to content + sender + timestamp for locally-created messages
+      if (m.content === newMsg.content && 
+          m.senderId === newMsg.senderId &&
+          m.createdAt && newMsg.createdAt) {
+        const timeDiff = Math.abs(
+          new Date(m.createdAt).getTime() - new Date(newMsg.createdAt).getTime()
+        )
+        return timeDiff < 1000 // Within 1 second
+      }
+      return false
+    })
   }
 
   const handleAddComment = async (e: React.FormEvent) => {
@@ -211,9 +374,9 @@ export const Workspaces: React.FC = () => {
       ) : workspaces.length === 0 ? (
         <EmptyState
           title="No Active Workspaces Found"
-          description="Workspaces are created automatically when a student matches or applies to an open project."
+          description="Workspaces are created automatically via RabbitMQ when a student matches or applies to an open project. This may take a few seconds. If you just matched a project, the page will auto-refresh. The page refreshes every 5 seconds."
           actionText={role === 'STUDENT' ? 'Explore Projects' : 'Post Project'}
-          onAction={() => {}}
+          onAction={() => navigate('/projects')}
         />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[600px]">
@@ -240,11 +403,14 @@ export const Workspaces: React.FC = () => {
                     <div className="flex items-center gap-2 mb-1">
                       <Hash className="w-3.5 h-3.5 text-brand-400" />
                       <span className="text-xs font-bold truncate">
-                        {ws.title || ws.name || `Workspace #${(ws.id || ws._id || '').substring(0, 6)}`}
+                        {ws.projectName || ws.title || ws.name || `Workspace #${(ws.id || ws._id || '').substring(0, 6)}`}
                       </span>
                     </div>
                     <div className="text-[10px] text-slate-400">
                       Status: <span className="text-emerald-400 font-semibold">{ws.status || 'ACTIVE'}</span>
+                    </div>
+                    <div className="mt-1 text-[9px] text-slate-500 font-mono">
+                      Project: {(ws.projectId || '').substring(0, 8)}...
                     </div>
                   </button>
                 )
@@ -260,8 +426,21 @@ export const Workspaces: React.FC = () => {
                 <div className="p-4 border-b border-white/10 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-bold text-white">
-                      {selectedWorkspace.title || selectedWorkspace.name || 'Active Collaboration Workspace'}
+                      {selectedWorkspace.projectName || selectedWorkspace.title || selectedWorkspace.name || 'Active Collaboration Workspace'}
                     </h2>
+                    <div className="text-[9px] text-slate-500 font-mono mt-1">
+                      Project: {(selectedWorkspace.projectId || '').substring(0, 8)}...
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedWorkspace.projectId || '')
+                          toast.success('Project ID copied')
+                        }}
+                        className="ml-2 px-1 py-0.5 text-[8px] bg-brand-500/20 hover:bg-brand-500/30 rounded border border-brand-500/30"
+                      >
+                        Copy
+                      </button>
+                    </div>
                     <span className="text-[10px] text-emerald-400 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                       Socket.io WebSockets Connected
@@ -342,50 +521,71 @@ export const Workspaces: React.FC = () => {
 
                 {/* Tab: Reviews */}
                 {activeTab === 'reviews' && (
-                  <div className="p-5 space-y-4">
-                    <div className="space-y-3">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        Inline Code Review Comments ({comments.length})
-                      </h3>
-                      {comments.length === 0 ? (
-                        <div className="p-6 text-center text-xs text-slate-500 bg-white/[0.02] border border-white/5 rounded-2xl">
-                          No code comments recorded yet. Add review notes below.
+                  <div className="flex-1 flex flex-col h-[480px]">
+                    <div className="flex-1 p-5 space-y-4 overflow-y-auto">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                            Real-time Code Review & Comments
+                          </h3>
+                          <span className="text-[10px] text-slate-500">({comments.length} comments)</span>
                         </div>
-                      ) : (
-                        comments.map((c, idx) => (
-                          <div key={idx} className="p-3 rounded-xl bg-white/5 border border-white/5 text-xs space-y-1">
-                            <div className="flex items-center justify-between text-[10px]">
-                              <span className="font-mono text-brand-300">Line {c.lineNumber || 'General'}</span>
-                              <span className="text-slate-500">{c.createdAt ? new Date(c.createdAt).toLocaleTimeString() : 'Recent'}</span>
-                            </div>
-                            <p className="text-slate-200">{c.content}</p>
+
+                        {comments.length === 0 ? (
+                          <div className="p-6 text-center text-xs text-slate-500 bg-white/[0.02] border border-white/5 rounded-2xl">
+                            <p className="mb-2">No code review comments yet.</p>
+                            <p className="text-[11px] text-slate-600">Add line-specific feedback or general code suggestions below.</p>
                           </div>
-                        ))
-                      )}
+                        ) : (
+                          <div className="space-y-2">
+                            {comments.map((c, idx) => (
+                              <div key={idx} className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className={`font-semibold px-2 py-0.5 rounded ${c.lineNumber ? 'bg-brand-500/20 text-brand-300' : 'bg-slate-700/30 text-slate-300'}`}>
+                                    {c.lineNumber ? `Line ${c.lineNumber}` : 'General Note'}
+                                  </span>
+                                  <span className="text-slate-600">{c.createdAt ? new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}</span>
+                                </div>
+                                {c.fileSnippet && (
+                                  <div className="p-2 rounded bg-slate-900/50 border border-slate-700/50 font-mono text-[10px] text-slate-400 overflow-x-auto max-h-16">
+                                    <code>{c.fileSnippet}</code>
+                                  </div>
+                                )}
+                                <p className="text-slate-300 text-xs">{c.content}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <form onSubmit={handleAddComment} className="pt-4 border-t border-white/10 space-y-2">
-                      <div className="grid grid-cols-4 gap-2">
-                        <input
-                          type="number"
-                          value={lineNumber}
-                          onChange={(e) => setLineNumber(e.target.value)}
-                          placeholder="Line #"
-                          className="col-span-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
-                        />
-                        <input
-                          type="text"
-                          value={commentInput}
-                          onChange={(e) => setCommentInput(e.target.value)}
-                          placeholder="Review suggestion or feedback..."
-                          className="col-span-3 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
-                        />
+                    <form onSubmit={handleAddComment} className="p-4 border-t border-white/10 space-y-2">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase">Add Code Review Comment</label>
+                        <div className="grid grid-cols-4 gap-2">
+                          <input
+                            type="number"
+                            value={lineNumber}
+                            onChange={(e) => setLineNumber(e.target.value)}
+                            placeholder="Line # (optional)"
+                            min="1"
+                            className="col-span-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
+                          />
+                          <input
+                            type="text"
+                            value={commentInput}
+                            onChange={(e) => setCommentInput(e.target.value)}
+                            placeholder="Your feedback or suggestion..."
+                            className="col-span-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
+                          />
+                        </div>
                       </div>
                       <button
                         type="submit"
-                        className="w-full py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold hover:bg-brand-600"
+                        disabled={!commentInput.trim()}
+                        className="w-full py-2 rounded-lg bg-brand-500 hover:bg-brand-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-xs font-bold transition-all"
                       >
-                        Submit Code Review Note
+                        Post Code Review Comment
                       </button>
                     </form>
                   </div>

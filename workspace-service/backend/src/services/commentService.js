@@ -12,14 +12,7 @@ const resolveWorkspace = async (workspaceId) => {
     workspace = await Workspace.findOne({ projectId: workspaceId });
   }
   if (!workspace) {
-    workspace = new Workspace({
-      projectId: workspaceId,
-      startupId: 'startup-owner-1',
-      studentId: 'student-user-1',
-      title: `Workspace for Project ${workspaceId.slice(0, 8)}`,
-      status: 'ACTIVE'
-    });
-    await workspace.save();
+    throw new Error(`Workspace not found for ID: ${workspaceId}. Workspace must exist before adding comments.`);
   }
   return workspace;
 };

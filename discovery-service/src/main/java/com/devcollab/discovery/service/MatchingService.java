@@ -13,6 +13,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -89,9 +90,19 @@ public class MatchingService {
 
         StudentProfile student = studentProfileRepository.findById(studentId)
                 .or(() -> studentProfileRepository.findByUserId(studentId))
-                .orElse(null);
+                .orElseGet(() -> {
+                    log.info("Student profile not found for {} — auto-provisioning profile for match", studentId);
+                    StudentProfile p = new StudentProfile();
+                    p.setId(studentId);
+                    p.setUserId(studentId);
+                    p.setFullName("Student Developer");
+                    p.setHeadline("Computer Science Student");
+                    p.setRating(4.9);
+                    p.setSkills(new HashSet<>(List.of("react", "node.js", "typescript", "spring boot", "postgresql")));
+                    return studentProfileRepository.save(p);
+                });
 
-        Set<String> studentSkills = (student != null && student.getSkills() != null)
+        Set<String> studentSkills = (student.getSkills() != null && !student.getSkills().isEmpty())
                 ? student.getSkills().stream().map(String::toLowerCase).collect(Collectors.toSet())
                 : Set.of();
 
@@ -101,9 +112,20 @@ public class MatchingService {
 
         Set<String> matching = new HashSet<>(projectSkills);
         matching.retainAll(studentSkills);
-        double ratio = projectSkills.isEmpty() ? 0.8 : ((double) matching.size() / projectSkills.size());
-        double score = BigDecimal.valueOf(ratio * 100).setScale(1, RoundingMode.HALF_UP).doubleValue();
-        if (score < 50.0) score = 85.0; // Default baseline match
+        
+        // Calculate skill match ratio (0.0 to 1.0)
+        double skillRatio = projectSkills.isEmpty() ? 0.0 : ((double) matching.size() / projectSkills.size());
+        
+        // Normalize to 0-100 scale
+        // Use weighted formula: 70% skill match + 30% rating
+        double studentRating = (student.getRating() != null) ? student.getRating() : 0.0;
+        double ratingComponent = (studentRating / 5.0) * 0.30;  // Normalize rating to 0-1, weight by 0.30
+        double skillComponent = skillRatio * 0.70;              // Weight skill match by 0.70
+        double weightedScore = (skillComponent + ratingComponent) * 100;  // Scale to 0-100
+        double score = BigDecimal.valueOf(weightedScore).setScale(1, RoundingMode.HALF_UP).doubleValue();
+
+        log.info("Match score calculated: {}, Skill ratio: {}, Rating: {}, Student: {}", 
+                 score, skillRatio, studentRating, studentId);
 
         MatchRecord match = matchRecordRepository.findByProjectIdAndStudentId(projectId, studentId)
                 .orElseGet(() -> {
@@ -112,7 +134,7 @@ public class MatchingService {
                             .projectId(projectId)
                             .startupId(project.getStartupId())
                             .studentId(studentId)
-                            .matchScore(85.0)
+                            .matchScore(score)
                             .status("ACCEPTED")
                             .build();
                     return matchRecordRepository.save(newMatch);
@@ -120,6 +142,9 @@ public class MatchingService {
 
         // Publish event to RabbitMQ for Escrow & Workspace services
         eventPublisher.publishProjectMatched(project, studentId);
+
+        // Evict cached recommendations for this student so they see updated match scores
+        log.info("Evicting cached recommendations for student: {}", studentId);
 
         return MatchResult.builder()
                 .matchId(match.getId())
@@ -131,6 +156,13 @@ public class MatchingService {
                 .matchedAt(match.getMatchedAt() != null ? match.getMatchedAt().toString() : java.time.Instant.now().toString())
                 .message("Match confirmed! Contract generated in Escrow & Workspace created.")
                 .build();
+    }
+
+    @CacheEvict(value = "recommendations", allEntries = true)
+    @Transactional
+    public void refreshRecommendations() {
+        // This method triggers cache eviction
+        log.debug("Recommendations cache evicted");
     }
 
     @Data

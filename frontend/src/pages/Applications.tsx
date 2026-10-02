@@ -14,6 +14,10 @@ import { EmptyState } from '../components/EmptyState'
 interface ApplicationItem {
   id: string
   projectId: string
+  project?: {
+    title: string
+    description: string
+  }
   studentId: string
   startupId: string
   matchScore: number
@@ -27,15 +31,33 @@ export const Applications: React.FC = () => {
   const studentId = user?.profileId || user?.id || 'demo-student-id'
 
   const [applications, setApplications] = useState<ApplicationItem[]>([])
+  const [projectNames, setProjectNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
+  // Fetch all applications
   useEffect(() => {
     const fetchApplications = async () => {
       setLoading(true)
       try {
         const res = await discoveryApi.getStudentMatches(studentId)
         const data = res.data?.data ?? []
-        setApplications(Array.isArray(data) ? data : [])
+        const apps = Array.isArray(data) ? data : []
+        setApplications(apps)
+
+        // Fetch project details for each application to get the project name
+        const names: Record<string, string> = {}
+        await Promise.all(
+          apps.map(async (app) => {
+            try {
+              const projRes = await discoveryApi.getProjectById(app.projectId)
+              const project = projRes.data?.data ?? {}
+              names[app.projectId] = project.title || `Project ${app.projectId.substring(0, 8)}`
+            } catch {
+              names[app.projectId] = `Project ${app.projectId.substring(0, 8)}`
+            }
+          })
+        )
+        setProjectNames(names)
       } catch (err) {
         console.error('Failed to load applications', err)
       } finally {
@@ -75,7 +97,7 @@ export const Applications: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     <Sparkles className="w-3.5 h-3.5" />
-                    {app.matchScore ? (app.matchScore > 1 ? Math.round(app.matchScore) : Math.round(app.matchScore * 100)) : 90}% Match Score
+                    {Number(app.matchScore).toFixed(0)}% Match Score
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-brand-500/10 text-brand-400 border border-brand-500/20">
                     {app.status || 'MATCHED'}
@@ -83,11 +105,11 @@ export const Applications: React.FC = () => {
                 </div>
 
                 <div>
-                  <h3 className="text-base font-bold text-white group-hover:text-brand-300 transition-colors">
-                    Project Application #{app.projectId.substring(0, 8)}
+                  <h3 className="text-base font-bold text-white group-hover:text-brand-300 transition-colors line-clamp-2">
+                    {projectNames[app.projectId] || `Project ${app.projectId.substring(0, 8)}`}
                   </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Application ID: <span className="font-mono text-slate-300">{app.id}</span>
+                  <p className="text-xs text-slate-400 mt-2">
+                    Application ID: <span className="font-mono text-slate-300">{app.id.substring(0, 12)}...</span>
                   </p>
                 </div>
               </div>

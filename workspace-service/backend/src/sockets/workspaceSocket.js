@@ -19,6 +19,8 @@
 import { logger } from '../utils/logger.js';
 import socketEmitter from '../utils/socketEmitter.js';
 import mongoose from 'mongoose';
+import messageService from '../services/messageService.js';
+import commentService from '../services/commentService.js';
 
 /**
  * Handle workspace room operations
@@ -62,32 +64,89 @@ export const handleWorkspaceSocket = (socket) => {
   /**
    * Real-time client-to-room message broadcast
    */
-  socket.on('send-message', (msgPayload) => {
+  socket.on('send-message', async (msgPayload) => {
     try {
       const workspaceId = msgPayload?.workspaceId;
       if (workspaceId) {
+        let payloadToEmit = { ...msgPayload };
+        const text = msgPayload.text || msgPayload.content;
+
+        // If this message was not yet saved to MongoDB via HTTP POST, persist it now
+        if (!msgPayload._id && !msgPayload.id && text) {
+          try {
+            const senderId = socket.user?.id || msgPayload.senderId || 'user';
+            const saved = await messageService.createMessage(workspaceId, {
+              text,
+              content: text,
+              senderId,
+              senderName: msgPayload.senderName || 'Member'
+            });
+            if (saved.success && saved.data) {
+              payloadToEmit = saved.data.toJSON ? saved.data.toJSON() : saved.data;
+              payloadToEmit.workspaceId = workspaceId;
+              payloadToEmit.content = text;
+              payloadToEmit.text = text;
+            }
+          } catch (dbErr) {
+            logger.warn(`Could not persist socket message to DB: ${dbErr.message}`);
+          }
+        }
+
         const room = socketEmitter.getWorkspaceRoom(workspaceId);
-        socket.to(room).emit('new-message', msgPayload);
-        socket.to(room).emit('message-created', msgPayload);
+        socket.to(room).emit('new-message', payloadToEmit);
+        socket.to(room).emit('message-created', payloadToEmit);
+        socket.emit('new-message', payloadToEmit);
+        socket.emit('message-created', payloadToEmit);
+        socket.emit('message-sent', { success: true, payload: payloadToEmit });
       }
     } catch (error) {
       logger.error(`Error broadcasting socket message: ${error.message}`);
+      socket.emit('error', { message: 'Failed to broadcast message' });
     }
   });
 
   /**
    * Real-time client-to-room code comment broadcast
    */
-  socket.on('send-comment', (cmtPayload) => {
+  socket.on('send-comment', async (cmtPayload) => {
     try {
       const workspaceId = cmtPayload?.workspaceId;
       if (workspaceId) {
+        let payloadToEmit = { ...cmtPayload };
+        const text = cmtPayload.text || cmtPayload.content;
+
+        // If this comment was not yet saved to MongoDB via HTTP POST, persist it now
+        if (!cmtPayload._id && !cmtPayload.id && text) {
+          try {
+            const authorId = socket.user?.id || cmtPayload.authorId || 'user';
+            const saved = await commentService.createComment(workspaceId, {
+              text,
+              content: text,
+              authorId,
+              lineNumber: cmtPayload.lineNumber,
+              fileRef: cmtPayload.fileSnippet || cmtPayload.fileRef
+            });
+            if (saved.success && saved.data) {
+              payloadToEmit = saved.data.toJSON ? saved.data.toJSON() : saved.data;
+              payloadToEmit.workspaceId = workspaceId;
+              payloadToEmit.content = text;
+              payloadToEmit.text = text;
+            }
+          } catch (dbErr) {
+            logger.warn(`Could not persist socket comment to DB: ${dbErr.message}`);
+          }
+        }
+
         const room = socketEmitter.getWorkspaceRoom(workspaceId);
-        socket.to(room).emit('new-comment', cmtPayload);
-        socket.to(room).emit('comment-created', cmtPayload);
+        socket.to(room).emit('new-comment', payloadToEmit);
+        socket.to(room).emit('comment-created', payloadToEmit);
+        socket.emit('new-comment', payloadToEmit);
+        socket.emit('comment-created', payloadToEmit);
+        socket.emit('comment-sent', { success: true, payload: payloadToEmit });
       }
     } catch (error) {
       logger.error(`Error broadcasting socket comment: ${error.message}`);
+      socket.emit('error', { message: 'Failed to broadcast comment' });
     }
   });
 
@@ -124,7 +183,7 @@ export const handleWorkspaceSocket = (socket) => {
    * Handle socket disconnect
    */
   socket.on('disconnect', (reason) => {
-    logger.info(`User ${socket.user.id} disconnected (socket: ${socket.id}): ${reason}`);
+    logger.info(`User ${socket.user?.id || 'anonymous'} disconnected (socket: ${socket.id}): ${reason}`);
   });
 };
 

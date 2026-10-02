@@ -28,26 +28,47 @@ public class AuthController {
     @PostMapping("/api/auth/token")
     public ResponseEntity<Map<String, Object>> getToken(@RequestBody TokenRequest request) {
         String role = request.getRole() != null ? request.getRole().toUpperCase() : "STARTUP";
-        String userId = request.getUserId() != null && !request.getUserId().isBlank()
-                ? request.getUserId()
-                : UUID.randomUUID().toString();
         String email = request.getEmail() != null && !request.getEmail().isBlank()
                 ? request.getEmail()
                 : role.toLowerCase() + "@devcollab.local";
+        String userId = request.getUserId() != null && !request.getUserId().isBlank()
+                ? request.getUserId()
+                : UUID.nameUUIDFromBytes(email.getBytes()).toString();
         String name = request.getName() != null && !request.getName().isBlank()
                 ? request.getName()
                 : role.charAt(0) + role.substring(1).toLowerCase() + " User";
 
         String token = jwtTokenService.generateToken(userId, email, role, name);
 
-        return ResponseEntity.ok(Map.of(
-                "token", token,
-                "accessToken", token,
-                "userId", userId,
-                "email", email,
-                "role", role,
-                "name", name
-        ));
+        Map<String, Object> response = new HashMap<>();
+        response.put("token", token);
+        response.put("accessToken", token);
+        response.put("userId", userId);
+        response.put("email", email);
+        response.put("role", role);
+        response.put("name", name);
+
+        if ("STUDENT".equals(role)) {
+            StudentProfile profile = studentProfileRepository.findByUserId(userId).orElseGet(() -> {
+                StudentProfile p = new StudentProfile();
+                p.setId(userId);
+                p.setUserId(userId);
+                p.setFullName(name);
+                p.setHeadline("Computer Science Student & Full Stack Developer");
+                p.setBio("Passionate about building scalable web apps and collaborative software.");
+                p.setHourlyRate(BigDecimal.valueOf(35.00));
+                p.setRating(4.9);
+                p.setSkills(new HashSet<>(List.of("React", "TypeScript", "Node.js", "PostgreSQL", "Spring Boot")));
+                return studentProfileRepository.save(p);
+            });
+            response.put("profileId", profile.getId());
+            response.put("skills", profile.getSkills());
+            response.put("headline", profile.getHeadline());
+            response.put("hourlyRate", profile.getHourlyRate());
+            response.put("rating", profile.getRating());
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/api/auth/login")

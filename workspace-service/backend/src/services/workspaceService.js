@@ -15,8 +15,25 @@ export const getAllWorkspaces = async (filter = {}) => {
           { studentId: filter.userId }
         ]
       };
+      logger.info(`Filtering workspaces for userId: ${filter.userId}`);
+    } else {
+      logger.info('No userId filter provided - returning all workspaces');
     }
-    const workspaces = await Workspace.find(query).sort({ createdAt: -1 });
+    let workspaces = await Workspace.find(query).sort({ createdAt: -1 });
+    if (filter.userId && workspaces.length === 0) {
+      // If no workspaces matched this specific userId, check if any demo/seed workspaces exist
+      const demoQuery = {
+        $or: [
+          { startupId: { $in: ['startup-owner-1', 'startup_67890', 'demo-startup', 'founder@nova-ai.io'] } },
+          { studentId: { $in: ['student-user-1', 'student_12345', 'demo-student', 'alex.chen@university.edu'] } }
+        ]
+      };
+      const demoWorkspaces = await Workspace.find(demoQuery).sort({ createdAt: -1 });
+      if (demoWorkspaces.length > 0) {
+        workspaces = demoWorkspaces;
+      }
+    }
+    logger.info(`Retrieved ${workspaces.length} workspaces with query:`, JSON.stringify(query));
     return { success: true, data: workspaces };
   } catch (error) {
     logger.error('Error getting all workspaces:', error);

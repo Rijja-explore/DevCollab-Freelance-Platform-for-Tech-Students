@@ -79,6 +79,35 @@ public class ProjectController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> updateProject(
+            @PathVariable String id,
+            @RequestBody UpdateProjectDto dto) {
+        Project project = projectService.updateProject(
+                id,
+                dto.getTitle(),
+                dto.getDescription(),
+                dto.getCategory(),
+                dto.getBudget(),
+                dto.getCurrency(),
+                dto.getRequiredSkills(),
+                dto.getStatus()
+        );
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("data", project);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> deleteProject(@PathVariable String id) {
+        projectService.deleteProject(id);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Project deleted successfully");
+        return ResponseEntity.ok(response);
+    }
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -91,5 +120,19 @@ public class ProjectController {
         private BigDecimal budget;
         private String currency;
         private Set<String> requiredSkills;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UpdateProjectDto {
+        private String title;
+        private String description;
+        private String category;
+        private BigDecimal budget;
+        private String currency;
+        private Set<String> requiredSkills;
+        private String status;
     }
 }

@@ -124,6 +124,17 @@ export const getExchange = () =>
   process.env.RABBITMQ_EXCHANGE || 'devcollab.events';
 
 /**
+ * Return the live connection.
+ * Throws if connectRabbitMQ() has not been called yet.
+ */
+export const getConnection = () => {
+  if (!connection) {
+    throw new Error('RabbitMQ connection is not initialised. Call connectRabbitMQ() first.');
+  }
+  return connection;
+};
+
+/**
  * Graceful shutdown — close channel then connection.
  */
 export const disconnectRabbitMQ = async () => {
