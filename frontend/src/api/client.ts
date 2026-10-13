@@ -88,6 +88,35 @@ export const discoveryApi = {
     client.get('/api/profiles/students'),
   graphql: (query: string, variables: Record<string, unknown> = {}) =>
     client.post('/graphql', { query, variables }),
+  analyzeMySkillGap: (projectId: string) =>
+    client.post('/graphql', {
+      query: `query AnalyzeMySkillGap($projectId: ID!) {
+        analyzeMySkillGap(projectId: $projectId) {
+          projectTitle
+          studentSkills
+          requiredSkills
+          matchedSkills
+          missingSkills
+          coverage
+          severity
+          explanations
+          recommendations {
+            courseId
+            title
+            skill
+            provider
+            durationHours
+            price
+            currency
+            difficulty
+            url
+            reason
+            score
+          }
+        }
+      }`,
+      variables: { projectId },
+    }),
 }
 
 // ─── Collaboration Workspace Service API ───────────────────────────────────────

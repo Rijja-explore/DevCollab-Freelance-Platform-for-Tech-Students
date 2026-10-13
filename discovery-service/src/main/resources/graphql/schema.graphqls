@@ -39,6 +39,34 @@ type MatchResult {
     message: String!
 }
 
+type SkillGapAnalysis {
+    studentId: ID!
+    projectId: ID!
+    projectTitle: String!
+    studentSkills: [String!]!
+    requiredSkills: [String!]!
+    matchedSkills: [String!]!
+    missingSkills: [String!]!
+    coverage: Float!
+    severity: String!
+    explanations: [String!]!
+    recommendations: [CourseRecommendation!]!
+}
+
+type CourseRecommendation {
+    courseId: ID!
+    title: String!
+    skill: String!
+    provider: String!
+    durationHours: Float!
+    price: Float!
+    currency: String!
+    difficulty: String!
+    url: String!
+    reason: String!
+    score: Float!
+}
+
 input CreateProjectInput {
     startupId: ID
     title: String!
@@ -65,6 +93,8 @@ type Query {
     matchRecommendations(studentId: ID!): [ProjectRecommendation!]!
     studentProfile(id: ID!): StudentProfile
     allStudentProfiles: [StudentProfile!]!
+    skillGap(studentId: ID!, projectId: ID!): SkillGapAnalysis!
+    analyzeMySkillGap(projectId: ID!): SkillGapAnalysis!
 }
 
 type Mutation {

@@ -9,9 +9,11 @@ import {
   Building,
   ArrowRight,
   Loader2,
+  BrainCircuit,
 } from 'lucide-react'
 import { discoveryApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { SkillGapAnalysis, SkillGapPanel } from '../components/SkillGapPanel'
 import toast from 'react-hot-toast'
 
 interface Project {
@@ -33,6 +35,8 @@ export const ProjectDetail: React.FC = () => {
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [matching, setMatching] = useState(false)
+  const [skillGap, setSkillGap] = useState<SkillGapAnalysis | null>(null)
+  const [analyzingSkillGap, setAnalyzingSkillGap] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -80,6 +84,22 @@ export const ProjectDetail: React.FC = () => {
       }, 3000) // Increased delay
     } finally {
       setMatching(false)
+    }
+  }
+
+  const handleAnalyzeSkillGap = async () => {
+    if (!project) return
+    setAnalyzingSkillGap(true)
+    try {
+      const response = await discoveryApi.analyzeMySkillGap(project.id)
+      const errors = response.data?.errors
+      if (errors?.length) throw new Error(errors[0].message || 'Skill-gap analysis failed')
+      setSkillGap(response.data?.data?.analyzeMySkillGap ?? null)
+      if (!response.data?.data?.analyzeMySkillGap) throw new Error('Skill-gap analysis returned no data')
+    } catch (error: any) {
+      toast.error(error.response?.data?.errors?.[0]?.message || error.message || 'Unable to analyze skill gap')
+    } finally {
+      setAnalyzingSkillGap(false)
     }
   }
 
@@ -222,24 +242,25 @@ export const ProjectDetail: React.FC = () => {
           </div>
 
           {role === 'STUDENT' ? (
-            <button
-              type="button"
-              onClick={handleApplyMatch}
-              disabled={matching}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 text-white text-xs font-bold hover:shadow-xl hover:shadow-brand-500/25 transition-all disabled:opacity-50"
-            >
-              {matching ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Publishing Match Event...
-                </>
-              ) : (
-                <>
-                  Apply & Instant Match
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
+            <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={handleAnalyzeSkillGap}
+                disabled={analyzingSkillGap}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-brand-500/30 bg-brand-500/10 text-brand-200 text-xs font-bold hover:bg-brand-500/20 transition-all disabled:opacity-50"
+              >
+                {analyzingSkillGap ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
+                {analyzingSkillGap ? 'Analyzing...' : 'Analyze Skill Gap'}
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyMatch}
+                disabled={matching}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 text-white text-xs font-bold hover:shadow-xl hover:shadow-brand-500/25 transition-all disabled:opacity-50"
+              >
+                {matching ? <><Loader2 className="w-4 h-4 animate-spin" /> Publishing Match Event...</> : <>Apply & Instant Match <ArrowRight className="w-4 h-4" /></>}
+              </button>
+            </div>
           ) : (
             <Link
               to="/contracts"
@@ -249,6 +270,7 @@ export const ProjectDetail: React.FC = () => {
             </Link>
           )}
         </div>
+        {skillGap && <SkillGapPanel analysis={skillGap} onClose={() => setSkillGap(null)} />}
       </div>
     </div>
   )

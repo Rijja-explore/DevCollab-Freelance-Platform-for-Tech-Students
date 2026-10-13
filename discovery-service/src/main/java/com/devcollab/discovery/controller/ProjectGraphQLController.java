@@ -6,6 +6,11 @@ import com.devcollab.discovery.entity.StudentProfile;
 import com.devcollab.discovery.repository.StudentProfileRepository;
 import com.devcollab.discovery.service.MatchingService;
 import com.devcollab.discovery.service.ProjectService;
+import com.devcollab.discovery.auth.JwtTokenService;
+import com.devcollab.discovery.skillgap.SkillGapService;
+import com.devcollab.discovery.skillgap.SkillGapTypes.SkillGapAnalysis;
+import com.auth0.jwt.interfaces.DecodedJWT;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +30,9 @@ public class ProjectGraphQLController {
     private final ProjectService projectService;
     private final MatchingService matchingService;
     private final StudentProfileRepository studentProfileRepository;
+    private final SkillGapService skillGapService;
+    private final JwtTokenService jwtTokenService;
+    private final HttpServletRequest request;
 
     @QueryMapping
     public List<Project> projects(@Argument String category, @Argument String status,
@@ -60,6 +68,47 @@ public class ProjectGraphQLController {
     @QueryMapping
     public List<StudentProfile> allStudentProfiles() {
         return studentProfileRepository.findAll();
+    }
+
+    @QueryMapping
+    public SkillGapAnalysis skillGap(@Argument String studentId, @Argument String projectId) {
+        DecodedJWT jwt = authenticatedUser();
+        String role = role(jwt);
+        if ("ADMIN".equals(role)) {
+            return skillGapService.analyze(studentId, projectId);
+        }
+        if ("STUDENT".equals(role)
+                && (studentId.equals(jwt.getSubject())
+                || studentProfileRepository.findByUserId(jwt.getSubject()).map(profile -> profile.getId().equals(studentId)).orElse(false))) {
+            return skillGapService.analyze(studentId, projectId);
+        }
+        throw new IllegalArgumentException("Forbidden: you cannot inspect this student's skill gap");
+    }
+
+    @QueryMapping
+    public SkillGapAnalysis analyzeMySkillGap(@Argument String projectId) {
+        DecodedJWT jwt = authenticatedUser();
+        if (!"STUDENT".equals(role(jwt))) {
+            throw new IllegalArgumentException("Forbidden: STUDENT role required");
+        }
+        return skillGapService.analyze(jwt.getSubject(), projectId);
+    }
+
+    private DecodedJWT authenticatedUser() {
+        String authorization = request.getHeader("Authorization");
+        if (authorization == null || !authorization.startsWith("Bearer ")) {
+            throw new IllegalArgumentException("Unauthorized: bearer token required");
+        }
+        try {
+            return jwtTokenService.verifyToken(authorization.substring(7));
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("Unauthorized: invalid or expired token");
+        }
+    }
+
+    private String role(DecodedJWT jwt) {
+        String role = jwt.getClaim("role").asString();
+        return role == null ? "" : role.toUpperCase(Locale.ROOT);
     }
 
     @MutationMapping
