@@ -100,7 +100,7 @@ export const SkillGapPanel: React.FC<SkillGapPanelProps> = ({ analysis, onClose 
           ) : (
             <div className="space-y-2">
               {analysis.recommendations.map((course) => (
-                <a key={course.courseId} href={course.url} target="_blank" rel="noreferrer" className="block rounded-xl border border-white/10 bg-white/[0.03] p-3 hover:border-brand-500/40 transition-colors">
+                <div key={course.courseId} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
@@ -112,7 +112,8 @@ export const SkillGapPanel: React.FC<SkillGapPanelProps> = ({ analysis, onClose 
                     <span className="text-xs font-bold text-brand-300">{course.score.toFixed(0)}</span>
                   </div>
                   <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{course.reason}</p>
-                </a>
+                  <p className="mt-2 text-[10px] uppercase tracking-wider text-slate-600">Mock catalog entry · no external enrollment page</p>
+                </div>
               ))}
             </div>
           )}
