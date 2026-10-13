@@ -29,7 +29,12 @@ public class CourseRecommendationService {
                     .toList();
             recommendations.addAll(perSkill);
         }
-        return recommendations.stream().limit(5).toList();
+        return recommendations.stream()
+            .sorted(Comparator.comparingDouble(CourseRecommendation::score).reversed()
+                .thenComparingDouble(CourseRecommendation::price)
+                .thenComparingDouble(CourseRecommendation::durationHours))
+            .limit(5)
+            .toList();
     }
 
     private CourseRecommendation toRecommendation(Course course) {

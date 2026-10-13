@@ -133,7 +133,7 @@ export const SkillGapPanel: React.FC<SkillGapPanelProps> = ({ analysis, onClose 
                       </div>
                       <p className="mt-1 text-[11px] text-slate-400">{course.provider} · {course.difficulty} · {course.durationHours}h · {course.price === 0 ? 'Free' : `${course.currency} ${course.price}`}</p>
                     </div>
-                    <span className="text-xs font-bold text-brand-300">{course.score.toFixed(0)}</span>
+                    <span className="text-xs font-bold text-brand-300">Score {course.score.toFixed(0)}</span>
                   </div>
                   <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{course.reason}</p>
                   <p className="mt-2 text-[10px] uppercase tracking-wider text-brand-300/70">Open official learning resource</p>

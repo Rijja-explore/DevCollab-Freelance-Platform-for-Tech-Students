@@ -36,4 +36,12 @@ class CourseRecommendationServiceTest {
         assertEquals(5, recommendations.size());
         assertTrue(recommendations.stream().noneMatch(course -> course.skill().equalsIgnoreCase("COBOL")));
     }
+
+    @Test
+    void sortsTheCappedRecommendationsGloballyByScore() {
+        var recommendations = service.recommend(List.of("Docker", "FastAPI"));
+
+        assertEquals(List.of("course-003", "course-002", "course-004", "course-001"), recommendations.stream()
+                .map(SkillGapTypes.CourseRecommendation::courseId).toList());
+    }
 }
