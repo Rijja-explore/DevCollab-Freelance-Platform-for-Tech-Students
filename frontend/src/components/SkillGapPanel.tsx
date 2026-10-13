@@ -1,5 +1,5 @@
 import React from 'react'
-import { BookOpen, CheckCircle2, CircleAlert, X } from 'lucide-react'
+import { BookOpen, CheckCircle2, CircleAlert, ExternalLink, X } from 'lucide-react'
 
 export interface SkillGapAnalysis {
   projectTitle: string
@@ -73,23 +73,46 @@ export const SkillGapPanel: React.FC<SkillGapPanelProps> = ({ analysis, onClose 
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Skill breakdown</h3>
-          <div className="flex flex-wrap gap-2">
-            {analysis.requiredSkills.map((skill) => {
-              const matched = analysis.matchedSkills.includes(skill)
-              return (
-                <span key={skill} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs ${matched ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-rose-500/20 bg-rose-500/10 text-rose-300'}`}>
-                  {matched && <CheckCircle2 className="w-3.5 h-3.5" />}
-                  {skill}
-                </span>
-              )
-            })}
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Your current skills</h3>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {analysis.studentSkills.length === 0 ? (
+                <p className="text-xs text-slate-500">No skills are saved on your student profile yet.</p>
+              ) : analysis.studentSkills.map((skill) => {
+                const matched = analysis.matchedSkills.some((required) => required.toLowerCase() === skill.toLowerCase())
+                return (
+                  <span key={skill} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs ${matched ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-white/10 bg-white/[0.03] text-slate-300'}`}>
+                    {matched && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    {skill}
+                  </span>
+                )
+              })}
+            </div>
           </div>
+
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Project requirements</h3>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {analysis.requiredSkills.map((skill) => {
+                const matched = analysis.matchedSkills.includes(skill)
+                return (
+                  <span key={skill} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs ${matched ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-rose-500/20 bg-rose-500/10 text-rose-300'}`}>
+                    {matched && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    {skill}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+
           {analysis.explanations.length > 0 && (
-            <ul className="space-y-2 text-xs leading-relaxed text-slate-400">
-              {analysis.explanations.map((explanation) => <li key={explanation}>{explanation}</li>)}
-            </ul>
+            <div className="rounded-xl border border-rose-500/15 bg-rose-500/[0.04] p-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-rose-200">Learning priorities</h3>
+              <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                Focus next on <span className="font-semibold text-slate-200">{analysis.missingSkills.join(', ')}</span> to meet this project&apos;s requirements.
+              </p>
+            </div>
           )}
         </div>
 
@@ -100,20 +123,21 @@ export const SkillGapPanel: React.FC<SkillGapPanelProps> = ({ analysis, onClose 
           ) : (
             <div className="space-y-2">
               {analysis.recommendations.map((course) => (
-                <div key={course.courseId} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <a key={course.courseId} href={course.url} target="_blank" rel="noreferrer" className="block rounded-xl border border-white/10 bg-white/[0.03] p-3 hover:border-brand-500/40 transition-colors">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
                         <BookOpen className="w-3.5 h-3.5 text-brand-300" />
                         <h4 className="text-xs font-bold text-white">{course.title}</h4>
+                        <ExternalLink className="w-3 h-3 text-slate-500" />
                       </div>
                       <p className="mt-1 text-[11px] text-slate-400">{course.provider} · {course.difficulty} · {course.durationHours}h · {course.price === 0 ? 'Free' : `${course.currency} ${course.price}`}</p>
                     </div>
                     <span className="text-xs font-bold text-brand-300">{course.score.toFixed(0)}</span>
                   </div>
                   <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{course.reason}</p>
-                  <p className="mt-2 text-[10px] uppercase tracking-wider text-slate-600">Mock catalog entry · no external enrollment page</p>
-                </div>
+                  <p className="mt-2 text-[10px] uppercase tracking-wider text-brand-300/70">Open official learning resource</p>
+                </a>
               ))}
             </div>
           )}
