@@ -7,7 +7,10 @@ import { format } from 'date-fns';
 import { Calendar, Search } from 'lucide-react';
 import { ServiceHeader } from '../components/ServiceHeader';
 
+import { useAuth } from '../contexts/AuthContext';
+
 export const Transactions: React.FC = () => {
+  const { user } = useAuth();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
 
@@ -25,10 +28,24 @@ export const Transactions: React.FC = () => {
   const totalPages = transactionsData?.totalPages ?? transactionsData?.data?.totalPages ?? 1;
 
   const filteredTransactions = transactionsList.filter(
-    (tx: any) =>
-      tx.providerOrderId?.toLowerCase().includes(search.toLowerCase()) ||
-      tx.providerPaymentId?.toLowerCase().includes(search.toLowerCase()) ||
-      tx.id.toLowerCase().includes(search.toLowerCase())
+    (tx: any) => {
+      // Visible only if user is participant in the escrow transaction
+      if (tx.contract) {
+        const isParticipant =
+          !user?.id ||
+          tx.contract.studentId === user?.id ||
+          tx.contract.studentId === user?.profileId ||
+          tx.contract.startupId === user?.id ||
+          tx.contract.startupId === user?.profileId;
+        if (!isParticipant) return false;
+      }
+
+      return (
+        tx.providerOrderId?.toLowerCase().includes(search.toLowerCase()) ||
+        tx.providerPaymentId?.toLowerCase().includes(search.toLowerCase()) ||
+        tx.id.toLowerCase().includes(search.toLowerCase())
+      );
+    }
   );
 
   return (

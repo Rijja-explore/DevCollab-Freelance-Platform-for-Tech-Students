@@ -8,31 +8,19 @@ import { logger } from '../utils/logger.js';
 export const getAllWorkspaces = async (filter = {}) => {
   try {
     let query = {};
-    if (filter.userId) {
+    const candidateIds = [filter.userId, filter.profileId].filter(Boolean);
+    if (candidateIds.length > 0) {
       query = {
         $or: [
-          { startupId: filter.userId },
-          { studentId: filter.userId }
+          { startupId: { $in: candidateIds } },
+          { studentId: { $in: candidateIds } }
         ]
       };
-      logger.info(`Filtering workspaces for userId: ${filter.userId}`);
+      logger.info(`Filtering workspaces for candidate IDs: ${candidateIds.join(', ')}`);
     } else {
-      logger.info('No userId filter provided - returning all workspaces');
+      logger.info('No userId/profileId filter provided - returning all workspaces');
     }
-    let workspaces = await Workspace.find(query).sort({ createdAt: -1 });
-    if (filter.userId && workspaces.length === 0) {
-      // If no workspaces matched this specific userId, check if any demo/seed workspaces exist
-      const demoQuery = {
-        $or: [
-          { startupId: { $in: ['startup-owner-1', 'startup_67890', 'demo-startup', 'founder@nova-ai.io'] } },
-          { studentId: { $in: ['student-user-1', 'student_12345', 'demo-student', 'alex.chen@university.edu'] } }
-        ]
-      };
-      const demoWorkspaces = await Workspace.find(demoQuery).sort({ createdAt: -1 });
-      if (demoWorkspaces.length > 0) {
-        workspaces = demoWorkspaces;
-      }
-    }
+    const workspaces = await Workspace.find(query).sort({ createdAt: -1 });
     logger.info(`Retrieved ${workspaces.length} workspaces with query:`, JSON.stringify(query));
     return { success: true, data: workspaces };
   } catch (error) {

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -9,12 +9,9 @@ import {
   CreditCard,
   Bell,
   User,
-  Settings,
   Briefcase,
   Users,
   Milestone,
-  ShieldCheck,
-  Code2,
   Sparkles,
   LogOut,
   UserPlus,
@@ -22,6 +19,7 @@ import {
   LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { workspaceApi } from '../api/client'
 
 interface SidebarProps {
   isOpen: boolean
@@ -44,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const { role, logout, user } = useAuth()
+  const [hasCollaboration, setHasCollaboration] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -52,45 +51,94 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const normalizedRole = ((role || user?.role || 'STUDENT') as string).toUpperCase()
 
-  // Define role-specific navigation lists strictly matching the user architecture
+  // Check if current user is participant in any active collaboration
+  useEffect(() => {
+    let isMounted = true
+    workspaceApi.getAll()
+      .then((res) => {
+        if (!isMounted) return
+        const data = res.data?.data ?? res.data ?? []
+        if (Array.isArray(data)) {
+          const isParticipant = data.some((ws: any) =>
+            ws.studentId === user?.id ||
+            ws.studentId === user?.profileId ||
+            ws.startupId === user?.id ||
+            ws.startupId === user?.profileId
+          )
+          setHasCollaboration(isParticipant)
+        }
+      })
+      .catch(() => {
+        // fallback
+      })
+    return () => { isMounted = false }
+  }, [user?.id, user?.profileId])
+
+  // Define role-specific navigation lists strictly matching user permissions
   const getNavSections = (): NavSection[] => {
     if (normalizedRole === 'STUDENT') {
+      const studentItems: NavItem[] = [
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview & metrics' },
+        { to: '/projects', label: 'Discover Projects', icon: Search, desc: 'Search & matching' },
+        { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Skill-matched gigs & gaps' },
+        { to: '/applications', label: 'My Applications', icon: Handshake, desc: 'Applied gigs & status' },
+      ]
+
+      // My Collaborations is visible ONLY to the particular student once accepted
+      if (hasCollaboration) {
+        studentItems.push({
+          to: '/workspaces',
+          label: 'My Collaborations',
+          icon: FolderGit2,
+          desc: 'Live chat & code review',
+        })
+      }
+
+      studentItems.push({ to: '/contracts', label: 'My Contracts', icon: FileText, desc: 'Escrow agreements' })
+
       return [
         {
           title: 'Student Navigation',
-          items: [
-            { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview & metrics' },
-            { to: '/projects', label: 'Discover Projects', icon: Search, desc: 'Search & matching' },
-            { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Skill-matched gigs & gaps' },
-            { to: '/applications', label: 'My Applications', icon: Handshake, desc: 'Applied gigs & status' },
-            { to: '/workspaces', label: 'My Collaborations', icon: FolderGit2, desc: 'Live chat & code review' },
-            { to: '/contracts', label: 'My Contracts', icon: FileText, desc: 'Escrow agreements' },
-          ],
+          items: studentItems,
         },
         {
           title: 'Account',
           items: [
             { to: '/notifications', label: 'Notifications', icon: Bell, desc: 'System updates' },
-            { to: '/profile', label: 'Developer Profile', icon: User, desc: 'Skills, hourly rate & portfolio' },
+            { to: '/profile', label: 'Developer Profile', icon: User, desc: 'Skills, qualifications & portfolio' },
           ],
         },
       ]
     }
 
     if (normalizedRole === 'STARTUP') {
+      const startupItems: NavItem[] = [
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Hires & budget overview' },
+        { to: '/projects', label: 'My Projects', icon: Briefcase, desc: 'Post & manage gigs' },
+        { to: '/talent', label: 'Find Talent', icon: Search, desc: 'Student developers' },
+        { to: '/applicants', label: 'Applicants', icon: Users, desc: 'Review & match talent' },
+      ]
+
+      // Collaborations visible only when startup has an active collaboration
+      if (hasCollaboration) {
+        startupItems.push({
+          to: '/workspaces',
+          label: 'Collaborations',
+          icon: FolderGit2,
+          desc: 'Workspaces & code reviews',
+        })
+      }
+
+      startupItems.push(
+        { to: '/contracts', label: 'Contracts', icon: FileText, desc: 'Escrow agreements' },
+        { to: '/milestones', label: 'Milestones & Escrow', icon: Milestone, desc: 'PayPal checkout & release' },
+        { to: '/transactions', label: 'Payment Ledger', icon: CreditCard, desc: 'Escrow deposit records' },
+      )
+
       return [
         {
           title: 'Startup Navigation',
-          items: [
-            { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Hires & budget overview' },
-            { to: '/projects', label: 'My Projects', icon: Briefcase, desc: 'Post & manage gigs' },
-            { to: '/talent', label: 'Find Talent', icon: Search, desc: 'Student developers' },
-            { to: '/applicants', label: 'Applicants', icon: Users, desc: 'Review & match talent' },
-            { to: '/workspaces', label: 'Collaborations', icon: FolderGit2, desc: 'Workspaces & code reviews' },
-            { to: '/contracts', label: 'Contracts', icon: FileText, desc: 'Escrow agreements' },
-            { to: '/milestones', label: 'Milestones & Escrow', icon: Milestone, desc: 'PayPal checkout & release' },
-            { to: '/transactions', label: 'Payment Ledger', icon: CreditCard, desc: 'Escrow deposit records' },
-          ],
+          items: startupItems,
         },
         {
           title: 'Account',
@@ -102,41 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       ]
     }
 
-    if (normalizedRole === 'ADMIN') {
-      return [
-        {
-          title: 'Platform Overview',
-          items: [
-            { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'System telemetry' },
-            { to: '/projects', label: 'Projects Catalog', icon: Search, desc: 'All platform listings' },
-            { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Matching algorithm' },
-            { to: '/talent', label: 'Find Talent', icon: Search, desc: 'All student developers' },
-            { to: '/applicants', label: 'Applicants', icon: Users, desc: 'All applications' },
-            { to: '/workspaces', label: 'Workspaces', icon: FolderGit2, desc: 'Active rooms' },
-          ],
-        },
-        {
-          title: 'Fintech & Security',
-          items: [
-            { to: '/contracts', label: 'Contracts', icon: FileText, desc: 'All contracts' },
-            { to: '/milestones', label: 'Milestones', icon: Milestone, desc: 'Milestone tracker' },
-            { to: '/transactions', label: 'Transactions', icon: CreditCard, desc: 'Ledger records' },
-            { to: '/audit-logs', label: 'Security Audit', icon: ShieldCheck, desc: 'Traceability trail' },
-            { to: '/graphql-explorer', label: 'GraphQL API', icon: Code2, desc: 'Schema explorer' },
-          ],
-        },
-        {
-          title: 'System & Account',
-          items: [
-            { to: '/notifications', label: 'Notifications', icon: Bell, desc: 'Event activity' },
-            { to: '/profile', label: 'Profile', icon: User, desc: 'Admin account' },
-            { to: '/settings', label: 'System Settings', icon: Settings, desc: 'RS256 & topology' },
-          ],
-        },
-      ]
-    }
-
-    // Safe fallback for unauthenticated or unexpected roles: Student view, NEVER Admin
+    // Default student view
     return [
       {
         title: 'Student Navigation',
@@ -144,7 +158,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview & metrics' },
           { to: '/projects', label: 'Discover Projects', icon: Search, desc: 'Search & matching' },
           { to: '/applications', label: 'My Applications', icon: Handshake, desc: 'Applied gigs' },
-          { to: '/workspaces', label: 'My Collaborations', icon: FolderGit2, desc: 'Live workspaces' },
         ],
       },
     ]

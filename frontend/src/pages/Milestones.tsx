@@ -124,7 +124,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onCapture
 import { useAuth } from '../contexts/AuthContext';
 
 export const Milestones: React.FC = () => {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const [searchParams] = useSearchParams();
   const contractIdParam = searchParams.get('contractId');
 
@@ -282,10 +282,20 @@ export const Milestones: React.FC = () => {
   const milestonesList = milestonesData?.content ?? milestonesData?.data?.content ?? (Array.isArray(milestonesData) ? milestonesData : []);
   const totalPages = milestonesData?.totalPages ?? milestonesData?.data?.totalPages ?? 1;
 
-  // Filter milestones if contractId parameter is present
-  const filteredMilestones = contractIdParam
-    ? milestonesList.filter((m: any) => m.contractId === contractIdParam)
-    : milestonesList;
+  // Filter milestones so they are visible only to the particular student and startup owner
+  const filteredMilestones = milestonesList.filter((m: any) => {
+    if (contractIdParam && m.contractId !== contractIdParam) return false;
+    if (m.contract) {
+      const isParticipant =
+        !user?.id ||
+        m.contract.studentId === user?.id ||
+        m.contract.studentId === user?.profileId ||
+        m.contract.startupId === user?.id ||
+        m.contract.startupId === user?.profileId;
+      if (!isParticipant) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">

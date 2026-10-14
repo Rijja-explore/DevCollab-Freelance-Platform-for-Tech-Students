@@ -83,14 +83,24 @@ public class ProjectController {
     public ResponseEntity<Map<String, Object>> updateProject(
             @PathVariable String id,
             @RequestBody UpdateProjectDto dto) {
+        // Enforce rule: A project cannot be edited once created
+        if (dto.getTitle() != null || dto.getDescription() != null || dto.getCategory() != null
+                || dto.getBudget() != null || dto.getCurrency() != null || dto.getRequiredSkills() != null) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("error", "Projects cannot be edited once created.");
+            err.put("message", "Projects cannot be edited once created.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(err);
+        }
+
         Project project = projectService.updateProject(
                 id,
-                dto.getTitle(),
-                dto.getDescription(),
-                dto.getCategory(),
-                dto.getBudget(),
-                dto.getCurrency(),
-                dto.getRequiredSkills(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 dto.getStatus()
         );
         Map<String, Object> response = new HashMap<>();

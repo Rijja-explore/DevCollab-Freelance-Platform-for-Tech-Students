@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { discoveryApi, workspaceApi } from '../api/client'
+import { discoveryApi } from '../api/client'
 import { useApi } from '../hooks/useApi'
 import { TableSkeleton } from '../components/LoadingSkeleton'
 import { EmptyState } from '../components/EmptyState'
@@ -46,52 +46,27 @@ export const Recommendations: React.FC = () => {
     }
   }, [user, currentRole, fetchRecommendations])
 
-  const recommendations: Recommendation[] = recsData?.data ?? (Array.isArray(recsData) ? recsData : [])
+  const recommendations: Recommendation[] = (recsData?.data ?? (Array.isArray(recsData) ? recsData : []))
+    .filter((rec: any) => !rec.project?.status || rec.project?.status === 'OPEN');
 
   const handleMatch = async (projectId: string) => {
     setMatchingId(projectId)
     try {
-      const actualStudentId = user?.profileId || (currentRole === 'STUDENT' ? user?.id : '88bb3b37-30f0-3247-8994-0f583cdf59c3')
+      const actualStudentId = (currentRole === 'STUDENT' ? (user?.id || user?.profileId) : '88bb3b37-30f0-3247-8994-0f583cdf59c3')
       if (!actualStudentId) {
         toast.error('User profile not loaded')
         setMatchingId(null)
         return
       }
-      const res = await discoveryApi.match(projectId, actualStudentId)
-      toast.success(res.data?.data?.message ?? 'Match confirmed! Workspace and Escrow initialized.')
-      // Refetch recommendations after match
+      const res = await discoveryApi.apply(projectId, actualStudentId)
+      toast.success(res.data?.data?.message || 'Application submitted! Waiting for startup owner approval.')
       fetchRecommendations(actualStudentId)
-      
-      // Wait for workspace to be created via RabbitMQ
-      let workspaceCreated = false
-      let attempts = 0
-      const maxAttempts = 15
-      
-      while (!workspaceCreated && attempts < maxAttempts) {
-        attempts++
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        try {
-          const workspacesRes = await workspaceApi.getAll()
-          const workspaces = workspacesRes.data?.data ?? workspacesRes.data ?? []
-          
-          const newWorkspace = Array.isArray(workspaces) && workspaces.find(
-            (ws: any) => ws.projectId === projectId || ws.projectId?.toLowerCase() === projectId.toLowerCase()
-          )
-          
-          if (newWorkspace) {
-            workspaceCreated = true
-            toast.success('Workspace ready! Redirecting...')
-          }
-        } catch (err) {
-          console.error('Error checking for workspace:', err)
-        }
-      }
-      
-      navigate('/workspaces')
+      setTimeout(() => {
+        navigate('/applications')
+      }, 1500)
     } catch (err: any) {
       console.error(err)
-      toast.error(err.response?.data?.error || 'Matching failed')
+      toast.error(err.response?.data?.error || err.message || 'Application submission failed')
     } finally {
       setMatchingId(null)
     }
@@ -173,12 +148,29 @@ export const Recommendations: React.FC = () => {
                   disabled={matchingId === rec.project.id}
                   className="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold transition-all shadow-lg shadow-brand-500/20 flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  {matchingId === rec.project.id ? 'Connecting...' : 'Apply & Match'}
+                  {matchingId === rec.project.id ? 'Submitting...' : 'Apply for Project'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
           ))}
+
+          {/* Quick link to explore all projects */}
+          <div className="p-6 rounded-3xl bg-indigo-950/20 border border-indigo-500/20 flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+            <div>
+              <h4 className="text-sm font-bold text-white">Looking for something else?</h4>
+              <p className="text-xs text-slate-400 mt-0.5">
+                The AI engine surfaces your top skill fits, but all open platform opportunities are available in the public catalog.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/projects')}
+              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/10 transition-all flex items-center gap-1.5 whitespace-nowrap"
+            >
+              Browse All Open Projects <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       )}
     </div>

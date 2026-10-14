@@ -6,7 +6,6 @@ import {
   Zap,
   LogOut,
   User,
-  Settings as SettingsIcon,
   ChevronDown,
   GraduationCap,
   Briefcase,
@@ -161,14 +160,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
               >
                 <UserPlus className="w-3.5 h-3.5 text-emerald-400" /> Create New Account
               </Link>
-              {normalizedRole === 'ADMIN' && (
-                <Link
-                  to="/settings"
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
-                >
-                  <SettingsIcon className="w-3.5 h-3.5 text-slate-400" /> System Settings
-                </Link>
-              )}
               <button
                 type="button"
                 onClick={handleLogout}

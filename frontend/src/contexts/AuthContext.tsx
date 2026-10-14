@@ -11,7 +11,6 @@ export interface UserProfile {
   name: string
   headline?: string
   bio?: string
-  hourlyRate?: number
   rating?: number
   skills?: string[]
   profileId?: string
@@ -24,7 +23,6 @@ export interface RegisterPayload {
   name: string
   headline?: string
   bio?: string
-  hourlyRate?: number
   skills?: string[]
 }
 
@@ -116,43 +114,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, _password?: string) => {
     setIsLoading(true)
+    const registered = JSON.parse(localStorage.getItem('devcollab_registered_users') || '{}')
+    const cachedUser = registered[email.toLowerCase().trim()]
+
     try {
       const res = await authApi.login(email)
       const data = res.data
-      const rawRole = ((data.role || '') as string).toUpperCase()
+      const rawRole = ((data.role || cachedUser?.role || '') as string).toUpperCase()
       const role: UserRole = (rawRole === 'STUDENT' || rawRole === 'STARTUP' || rawRole === 'ADMIN')
         ? (rawRole as UserRole)
-        : (email.toLowerCase().includes('student') || email.toLowerCase().includes('alex') ? 'STUDENT' : email.toLowerCase().includes('admin') ? 'ADMIN' : 'STARTUP')
+        : (cachedUser?.role || (email.toLowerCase().includes('student') || email.toLowerCase().includes('alex') ? 'STUDENT' : email.toLowerCase().includes('admin') ? 'ADMIN' : 'STARTUP'))
 
       const userProfile: UserProfile = {
-        id: data.userId || 'user-' + Date.now(),
+        id: data.userId || (cachedUser ? 'user-' + email.replace(/[^a-zA-Z0-9]/g, '') : 'user-' + Date.now()),
         email: data.email || email,
         role: role,
-        name: data.name || email.split('@')[0],
-        headline: data.headline || (role === 'STUDENT' ? 'Student Developer' : 'Startup Client'),
-        skills: data.skills || (role === 'STUDENT' ? ['React', 'TypeScript', 'Node.js'] : []),
+        name: data.name || cachedUser?.name || email.split('@')[0],
+        headline: data.headline || cachedUser?.headline || (role === 'STUDENT' ? 'Student Developer' : 'Startup Client'),
+        skills: data.skills || cachedUser?.skills || (role === 'STUDENT' ? ['React', 'TypeScript', 'Node.js'] : []),
         profileId: data.profileId,
-        hourlyRate: data.hourlyRate,
         rating: data.rating || 4.9,
       }
       persistAuth(data.token || data.accessToken, userProfile)
-      toast.success(`Welcome back, ${userProfile.name}!`)
+      toast.success(`Welcome back, ${userProfile.name}! (${role === 'STUDENT' ? 'Student' : 'Startup'})`)
     } catch {
-      const role: UserRole = (email.toLowerCase().includes('student') || email.toLowerCase().includes('alex')) ? 'STUDENT' : email.toLowerCase().includes('admin') ? 'ADMIN' : 'STARTUP'
+      const role: UserRole = cachedUser?.role || ((email.toLowerCase().includes('student') || email.toLowerCase().includes('alex')) ? 'STUDENT' : email.toLowerCase().includes('admin') ? 'ADMIN' : 'STARTUP')
       const demo = DEFAULT_USERS[role]
       const fallbackToken = 'devcollab-jwt-' + Math.random().toString(36).substring(2)
       const userProfile: UserProfile = {
-        id: 'demo-' + role.toLowerCase(),
+        id: cachedUser ? 'user-' + email.replace(/[^a-zA-Z0-9]/g, '') : 'demo-' + role.toLowerCase(),
         email: email || demo.email,
         role: role,
-        name: demo.name,
-        headline: demo.headline,
-        skills: demo.skills,
-        hourlyRate: role === 'STUDENT' ? 45 : undefined,
+        name: cachedUser?.name || demo.name,
+        headline: cachedUser?.headline || demo.headline,
+        skills: cachedUser?.skills || demo.skills,
         rating: 4.95,
       }
       persistAuth(fallbackToken, userProfile)
-      toast.success(`Signed in as ${userProfile.name}`)
+      toast.success(`Signed in as ${userProfile.name} (${role === 'STUDENT' ? 'Student' : 'Startup'})`)
     } finally {
       setIsLoading(false)
     }
@@ -160,6 +159,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (payload: RegisterPayload) => {
     setIsLoading(true)
+    // Cache registered account locally so client-side routing and fallback logins always retain the selected role
+    try {
+      const registered = JSON.parse(localStorage.getItem('devcollab_registered_users') || '{}')
+      registered[payload.email.toLowerCase().trim()] = {
+        role: payload.role,
+        name: payload.name,
+        headline: payload.headline,
+        bio: payload.bio,
+        skills: payload.skills,
+      }
+      localStorage.setItem('devcollab_registered_users', JSON.stringify(registered))
+    } catch {
+      // ignore storage quota issues
+    }
+
     try {
       const res = await authApi.register(payload)
       const data = res.data
@@ -171,7 +185,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headline: data.headline || payload.headline,
         bio: payload.bio,
         skills: data.skills || payload.skills || [],
-        hourlyRate: data.hourlyRate || payload.hourlyRate,
         profileId: data.profileId,
         rating: data.rating || 5.0,
       }
@@ -187,7 +200,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headline: payload.headline || (payload.role === 'STUDENT' ? 'Student Engineer' : 'Founder'),
         bio: payload.bio,
         skills: payload.skills || ['React', 'TypeScript'],
-        hourlyRate: payload.hourlyRate || 40,
         rating: 5.0,
       }
       persistAuth(fallbackToken, userProfile)
@@ -210,7 +222,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: data.name || demo.name,
         headline: demo.headline,
         skills: demo.skills,
-        hourlyRate: targetRole === 'STUDENT' ? 45 : undefined,
         rating: 4.95,
       }
       persistAuth(data.token || data.accessToken, userProfile)
@@ -224,7 +235,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: demo.name,
         headline: demo.headline,
         skills: demo.skills,
-        hourlyRate: targetRole === 'STUDENT' ? 45 : undefined,
         rating: 4.95,
       }
       persistAuth(fallbackToken, userProfile)

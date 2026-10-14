@@ -76,8 +76,14 @@ export const discoveryApi = {
     if (skills && skills.length) skills.forEach((s) => params.append('skills', s))
     return client.get(`/api/profiles/students/search?${params}`)
   },
+  apply: (projectId: string, studentId: string) =>
+    client.post('/api/matches/apply', { projectId, studentId }),
   match: (projectId: string, studentId: string) =>
     client.post('/api/matches', { projectId, studentId }),
+  approveMatch: (matchId: string, startupId?: string) =>
+    client.post(`/api/matches/${matchId}/approve`, { startupId }),
+  rejectMatch: (matchId: string, startupId?: string) =>
+    client.post(`/api/matches/${matchId}/reject`, { startupId }),
   getAllMatches: () =>
     client.get('/api/matches'),
   getStudentMatches: (studentId: string) =>
@@ -121,8 +127,19 @@ export const discoveryApi = {
 
 // ─── Collaboration Workspace Service API ───────────────────────────────────────
 export const workspaceApi = {
-  getAll: () =>
-    client.get('/api/workspaces'),
+  getAll: (profileId?: string) => {
+    let pId = profileId
+    if (!pId) {
+      try {
+        const u = JSON.parse(localStorage.getItem('devcollab_user') || '{}')
+        pId = u?.profileId
+      } catch {
+        // ignore
+      }
+    }
+    const params = pId ? `?profileId=${encodeURIComponent(pId)}` : ''
+    return client.get(`/api/workspaces${params}`)
+  },
   getById: (id: string) =>
     client.get(`/api/workspaces/${id}`),
   getMessages: (workspaceId: string, limit = 50) =>

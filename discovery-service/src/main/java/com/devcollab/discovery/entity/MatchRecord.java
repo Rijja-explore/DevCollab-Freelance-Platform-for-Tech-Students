@@ -34,7 +34,7 @@ public class MatchRecord {
 
     @Column(name = "status", length = 50, nullable = false)
     @Builder.Default
-    private String status = "ACCEPTED";
+    private String status = "PENDING";
 
     @CreationTimestamp
     @Column(name = "matched_at", updatable = false)
@@ -46,7 +46,7 @@ public class MatchRecord {
             this.id = UUID.randomUUID().toString();
         }
         if (this.status == null) {
-            this.status = "ACCEPTED";
+            this.status = "PENDING";
         }
     }
 }

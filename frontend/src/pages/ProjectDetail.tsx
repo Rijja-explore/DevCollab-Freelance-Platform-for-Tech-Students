@@ -71,17 +71,14 @@ export const ProjectDetail: React.FC = () => {
     if (!project) return
     setMatching(true)
     try {
-      const studentId = user?.profileId || user?.id || 'student-user-1'
-      await discoveryApi.match(project.id, studentId)
-      toast.success('Successfully matched! RabbitMQ project.matched event dispatched. Workspace creation in progress...')
+      const studentId = user?.id || user?.profileId || 'student-user-1'
+      const res = await discoveryApi.apply(project.id, studentId)
+      toast.success(res.data?.data?.message || 'Application submitted! Waiting for startup owner approval.')
       setTimeout(() => {
-        navigate('/workspaces')
-      }, 3000) // Increased delay to allow workspace creation
-    } catch {
-      toast.success('Application submitted! Collaboration workspace activated.')
-      setTimeout(() => {
-        navigate('/workspaces')
-      }, 3000) // Increased delay
+        navigate('/applications')
+      }, 1500)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || err.message || 'Failed to submit application')
     } finally {
       setMatching(false)
     }
@@ -237,29 +234,45 @@ export const ProjectDetail: React.FC = () => {
         <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-xs text-slate-400">
             {role === 'STUDENT'
-              ? 'Clicking apply triggers RabbitMQ project.matched event to create the collaboration workspace.'
+              ? 'Submit your application to the startup owner. Once approved, the workspace and escrow contract will be created.'
               : 'Logged in as ' + role + '. You can manage contracts and milestones in the Escrow vault.'}
           </div>
 
           {role === 'STUDENT' ? (
             <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                onClick={handleAnalyzeSkillGap}
-                disabled={analyzingSkillGap}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-brand-500/30 bg-brand-500/10 text-brand-200 text-xs font-bold hover:bg-brand-500/20 transition-all disabled:opacity-50"
-              >
-                {analyzingSkillGap ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
-                {analyzingSkillGap ? 'Analyzing...' : 'Analyze Skill Gap'}
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyMatch}
-                disabled={matching}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 text-white text-xs font-bold hover:shadow-xl hover:shadow-brand-500/25 transition-all disabled:opacity-50"
-              >
-                {matching ? <><Loader2 className="w-4 h-4 animate-spin" /> Publishing Match Event...</> : <>Apply & Instant Match <ArrowRight className="w-4 h-4" /></>}
-              </button>
+              {project.status && project.status !== 'OPEN' ? (
+                <div className="flex items-center gap-3">
+                  <span className="px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-semibold">
+                    This project has been accepted by a student and is no longer available.
+                  </span>
+                  <Link
+                    to="/projects"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-bold hover:bg-white/10 transition-all"
+                  >
+                    Browse Open Projects
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleAnalyzeSkillGap}
+                    disabled={analyzingSkillGap}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl border border-brand-500/30 bg-brand-500/10 text-brand-200 text-xs font-bold hover:bg-brand-500/20 transition-all disabled:opacity-50"
+                  >
+                    {analyzingSkillGap ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
+                    {analyzingSkillGap ? 'Analyzing...' : 'Analyze Skill Gap'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApplyMatch}
+                    disabled={matching}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 text-white text-xs font-bold hover:shadow-xl hover:shadow-brand-500/25 transition-all disabled:opacity-50"
+                  >
+                    {matching ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting Application...</> : <>Accept / Apply for Project <ArrowRight className="w-4 h-4" /></>}
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <Link

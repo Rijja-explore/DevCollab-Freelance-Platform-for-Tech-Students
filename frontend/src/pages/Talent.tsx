@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Star,
-  DollarSign,
   Search,
-  MessageSquare,
 } from 'lucide-react'
 import { discoveryApi } from '../api/client'
 import { ServiceHeader } from '../components/ServiceHeader'
@@ -17,7 +15,6 @@ interface StudentProfile {
   name: string
   headline?: string
   bio?: string
-  hourlyRate?: number
   rating?: number
   skills?: string[]
 }
@@ -137,16 +134,15 @@ export const Talent: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                <div className="text-xs font-bold text-emerald-400 flex items-center gap-0.5">
-                  <DollarSign className="w-3.5 h-3.5" />
-                  {student.hourlyRate || 35}/hr
+                <div className="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+                  <span>★</span>
+                  <span>{student.rating ? Number(student.rating).toFixed(1) : '5.0'} Developer Rating</span>
                 </div>
                 <Link
-                  to="/workspaces"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all shadow-md shadow-indigo-600/20"
+                  to="/applicants"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-all border border-white/10"
                 >
-                  <MessageSquare className="w-3 h-3" />
-                  Message
+                  View Applicants
                 </Link>
               </div>
             </div>

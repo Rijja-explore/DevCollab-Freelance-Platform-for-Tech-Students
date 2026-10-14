@@ -4,11 +4,8 @@ import {
   ArrowLeft,
   MessageSquare,
   Code2,
-  Milestone,
   Send,
   Users,
-  CheckCircle2,
-  Clock,
   FileCode,
   ShieldCheck,
   Plus,
@@ -42,7 +39,7 @@ interface CodeComment {
 export const WorkspaceDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState<'chat' | 'code' | 'milestones'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'code'>('chat')
   const [workspace, setWorkspace] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [messages, setMessages] = useState<Message[]>([])
@@ -271,18 +268,6 @@ export async function releaseMilestoneFunds(milestoneId: string) {
             <Code2 className="w-3.5 h-3.5" />
             Code Reviews
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('milestones')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === 'milestones'
-                ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Milestone className="w-3.5 h-3.5" />
-            Milestones
-          </button>
         </div>
       </div>
 
@@ -360,31 +345,35 @@ export async function releaseMilestoneFunds(milestoneId: string) {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold text-xs">
-                  ER
+                  {workspace?.startupName ? workspace.startupName.substring(0, 2).toUpperCase() : (user?.role === 'STARTUP' ? user.name.substring(0, 2).toUpperCase() : 'SO')}
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-white">Elena Rostova</div>
-                  <div className="text-[10px] text-slate-400">Startup Founder</div>
+                  <div className="text-xs font-bold text-white">Startup Owner</div>
+                  <div className="text-[11px] text-slate-300 font-medium">
+                    {workspace?.startupName || (user?.role === 'STARTUP' ? user.name : 'Startup Founder')}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-brand-500/20 border border-brand-500/30 flex items-center justify-center text-brand-400 font-bold text-xs">
-                  AC
+                  {workspace?.studentName ? workspace.studentName.substring(0, 2).toUpperCase() : (user?.role === 'STUDENT' ? user.name.substring(0, 2).toUpperCase() : 'ST')}
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-white">Alex Chen</div>
-                  <div className="text-[10px] text-slate-400">Student Developer</div>
+                  <div className="text-xs font-bold text-white">Approved Candidate</div>
+                  <div className="text-[11px] text-emerald-400 font-medium">
+                    {workspace?.studentName || (user?.role === 'STUDENT' ? user.name : 'Rijja')}
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="pt-4 border-t border-white/10 space-y-2">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Security & Escrow
+                Direct Collaboration
               </div>
               <div className="flex items-center gap-2 text-xs text-emerald-400">
                 <ShieldCheck className="w-4 h-4" />
-                <span>PayPal Milestone Protection Active</span>
+                <span>Private channel with approved candidate</span>
               </div>
             </div>
           </div>
@@ -430,14 +419,14 @@ export async function releaseMilestoneFunds(milestoneId: string) {
                 {comments.map((cmt, idx) => (
                   <div key={idx} className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold text-brand-400">{cmt.authorName || 'Reviewer'}</span>
+                      <span className="font-bold text-brand-400">{cmt.authorName || (cmt as any).authorId || 'Reviewer'}</span>
                       {cmt.lineNumber && (
                         <span className="px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300 text-[10px] font-mono">
                           Line {cmt.lineNumber}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-300">{cmt.content}</p>
+                    <p className="text-xs text-slate-300 whitespace-pre-wrap">{cmt.content || (cmt as any).text}</p>
                   </div>
                 ))}
               </div>
@@ -461,58 +450,6 @@ export async function releaseMilestoneFunds(milestoneId: string) {
                 <Plus className="w-3.5 h-3.5" /> Submit Review Note
               </button>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Milestones Tab */}
-      {activeTab === 'milestones' && (
-        <div className="p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl shadow-2xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-white/10">
-            <div>
-              <h3 className="text-lg font-bold text-white">Project Milestones & Deliverables</h3>
-              <p className="text-xs text-slate-400">Track milestones and approval releases linked to escrow</p>
-            </div>
-            <Link
-              to="/milestones"
-              className="px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold hover:bg-brand-600 transition-all"
-            >
-              Open Milestone Vault
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">Milestone 1: Architecture & API Client</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  RELEASED ($400)
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Setup repository, configure TypeScript and RS256 token verification.
-              </p>
-              <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Approved & Settled to Student PayPal</span>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">Milestone 2: Real-time Workspace & UI</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  IN PROGRESS ($800)
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Integrate Socket.io chat, code review comments and PayPal smart checkout.
-              </p>
-              <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                <Clock className="w-4 h-4 text-amber-400" />
-                <span>Deliverable under review</span>
-              </div>
-            </div>
           </div>
         </div>
       )}

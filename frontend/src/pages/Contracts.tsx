@@ -186,6 +186,18 @@ export const Contracts: React.FC = () => {
   const normalizedSearch = search.toLowerCase().trim();
 
   const filteredContracts = contractsList.filter((c: any) => {
+    // Escrow contract is visible ONLY to the particular student and the startup owner
+    const isParticipant =
+      !user?.id || // fallback if user not yet resolved
+      c?.studentId === user?.id ||
+      c?.studentId === user?.profileId ||
+      c?.startupId === user?.id ||
+      c?.startupId === user?.profileId;
+
+    if (!isParticipant) {
+      return false;
+    }
+
     const contractTitle = String(c?.title ?? '').toLowerCase();
     const contractId = String(c?.id ?? '').toLowerCase();
 
