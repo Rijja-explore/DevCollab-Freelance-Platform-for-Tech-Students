@@ -21,6 +21,7 @@ import { format } from 'date-fns'
 
 export const Dashboard: React.FC = () => {
   const { user, role } = useAuth()
+  const normalizedRole = ((role || user?.role || 'STUDENT') as string).toUpperCase()
   const [stats, setStats] = useState({
     totalProjects: 0,
     activeWorkspaces: 0,
@@ -39,7 +40,7 @@ export const Dashboard: React.FC = () => {
           discoveryApi.getProjects(),
           workspaceApi.getAll(),
           contractsApi.getAll(0, 10),
-          transactionsApi.getAll(0, 10),
+          normalizedRole !== 'STUDENT' ? transactionsApi.getAll(0, 10) : Promise.resolve({ data: { content: [] } }),
         ])
 
         const projData = projRes.status === 'fulfilled' ? (projRes.value.data?.data ?? projRes.value.data ?? []) : []
@@ -58,7 +59,7 @@ export const Dashboard: React.FC = () => {
           setRecentProjects(projData.slice(0, 4))
         }
 
-        if (role === 'ADMIN') {
+        if (normalizedRole === 'ADMIN') {
           try {
             const auditRes = await auditApi.getAll(0, 5)
             setRecentLogs(auditRes.data?.data?.content ?? auditRes.data?.content ?? [])
@@ -74,7 +75,7 @@ export const Dashboard: React.FC = () => {
     }
 
     fetchDashboardData()
-  }, [role])
+  }, [normalizedRole])
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -83,20 +84,20 @@ export const Dashboard: React.FC = () => {
         <div className="max-w-2xl relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20 text-xs font-semibold mb-3">
             <Zap className="w-3.5 h-3.5" />
-            <span>Active Role: <strong className="text-white">{role}</strong></span>
+            <span>Active Role: <strong className="text-white">{normalizedRole}</strong></span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             Welcome back, {user?.name || 'DevCollab Member'}!
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
-            {role === 'STUDENT' && 'Explore open freelance projects, collaborate in real-time workspaces, and earn through secured PayPal milestone payouts.'}
-            {role === 'STARTUP' && 'Post freelance projects, discover top university student talent with AI match scoring, and manage milestone escrow payments.'}
-            {role === 'ADMIN' && 'Full system telemetry: Monitor microservices health, audit trails, and manage contracts across the DevCollab platform.'}
+            {normalizedRole === 'STUDENT' && 'Explore open freelance projects, collaborate in real-time workspaces, and earn through secured PayPal milestone payouts.'}
+            {normalizedRole === 'STARTUP' && 'Post freelance projects, discover top university student talent with AI match scoring, and manage milestone escrow payments.'}
+            {normalizedRole === 'ADMIN' && 'Full system telemetry: Monitor microservices health, audit trails, and manage contracts across the DevCollab platform.'}
           </p>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3 relative z-10">
-          {role === 'STUDENT' && (
+          {normalizedRole === 'STUDENT' && (
             <>
               <Link
                 to="/projects"
@@ -119,7 +120,7 @@ export const Dashboard: React.FC = () => {
             </>
           )}
 
-          {role === 'STARTUP' && (
+          {normalizedRole === 'STARTUP' && (
             <>
               <Link
                 to="/projects"
@@ -148,7 +149,7 @@ export const Dashboard: React.FC = () => {
             </>
           )}
 
-          {role === 'ADMIN' && (
+          {normalizedRole === 'ADMIN' && (
             <>
               <Link
                 to="/audit-logs"
@@ -193,14 +194,25 @@ export const Dashboard: React.FC = () => {
           loading={loading}
           accent="coral"
         />
-        <StatCard
-          title="Transactions Ledger"
-          value={stats.totalTransactions}
-          description="PayPal Sandbox settlements"
-          icon={DollarSign}
-          loading={loading}
-          accent="amber"
-        />
+        {normalizedRole === 'STUDENT' ? (
+          <StatCard
+            title="Escrow Payouts"
+            value="Protected"
+            description="Guaranteed milestone escrow"
+            icon={DollarSign}
+            loading={loading}
+            accent="amber"
+          />
+        ) : (
+          <StatCard
+            title="Transactions Ledger"
+            value={stats.totalTransactions}
+            description="PayPal Sandbox settlements"
+            icon={DollarSign}
+            loading={loading}
+            accent="amber"
+          />
+        )}
       </div>
 
       {/* Real Recent Projects & Quick Action Panes */}

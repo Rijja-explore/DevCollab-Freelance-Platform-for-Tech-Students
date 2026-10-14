@@ -78,7 +78,9 @@ public class MilestoneController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UserPrincipal principal) {
 
-        UUID actorId = principal != null ? principal.getUserId() : UUID.randomUUID();
+        String actorId = principal != null && principal.getUserId() != null
+                ? principal.getUserId().toString()
+                : (principal != null && principal.getEmail() != null ? principal.getEmail() : "system");
         String actorEmail = principal != null ? principal.getEmail() : "system";
         MilestoneResponse response = milestoneService.approveMilestone(id, actorId, actorEmail);
         return ResponseEntity.ok(ApiResponse.success(response, "Milestone approved. Payment order created."));
@@ -110,5 +112,17 @@ public class MilestoneController {
                             .build());
         }
         return ResponseEntity.ok(ApiResponse.success(response, "Payment release initiated"));
+    }
+
+    @PostMapping("/{id}/complete")
+    @PreAuthorize("hasAnyRole('STARTUP', 'ADMIN')")
+    @Operation(summary = "Manually mark milestone as completed and release funds")
+    public ResponseEntity<ApiResponse<MilestoneResponse>> completeMilestone(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        String actor = principal != null && principal.getEmail() != null ? principal.getEmail() : "system";
+        milestoneService.confirmPaymentRelease(id, "MANUAL_CAP_" + UUID.randomUUID().toString().substring(0, 8),
+                "MANUAL_ORDER", actor);
+        return ResponseEntity.ok(ApiResponse.success(milestoneService.getById(id), "Milestone payment released and completed"));
     }
 }

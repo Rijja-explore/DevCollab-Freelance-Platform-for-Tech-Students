@@ -44,11 +44,12 @@ export const Talent: React.FC = () => {
     fetchProfiles()
   }, [])
 
-  const filteredTalent = profiles.filter((p) => {
+  const filteredTalent = profiles.filter((p: any) => {
     const term = search.toLowerCase()
-    const nameMatch = p.name?.toLowerCase().includes(term)
-    const headlineMatch = p.headline?.toLowerCase().includes(term)
-    const skillMatch = p.skills?.some((s) => s.toLowerCase().includes(term))
+    const nameStr = p.name || p.fullName || ''
+    const nameMatch = nameStr.toLowerCase().includes(term)
+    const headlineMatch = (p.headline || '').toLowerCase().includes(term)
+    const skillMatch = p.skills?.some((s: string) => s.toLowerCase().includes(term))
     return nameMatch || headlineMatch || skillMatch
   })
 
@@ -92,9 +93,11 @@ export const Talent: React.FC = () => {
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-brand-600 flex items-center justify-center font-bold text-white text-base shadow-lg shadow-indigo-600/20">
-                    {student.name
-                      ? student.name.split(' ').map((n) => n[0]).join('').toUpperCase()
-                      : 'ST'}
+                    {((student as any).fullName || student.name || 'ST')
+                      .split(' ')
+                      .map((n: string) => n[0])
+                      .join('')
+                      .toUpperCase()}
                   </div>
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-semibold">
                     <Star className="w-3.5 h-3.5 fill-amber-400" />
@@ -104,7 +107,7 @@ export const Talent: React.FC = () => {
 
                 <div>
                   <h3 className="text-base font-bold text-white group-hover:text-indigo-300 transition-colors">
-                    {student.name}
+                    {(student as any).fullName || student.name || 'Student Developer'}
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {student.headline || 'Student Full-Stack Developer'}

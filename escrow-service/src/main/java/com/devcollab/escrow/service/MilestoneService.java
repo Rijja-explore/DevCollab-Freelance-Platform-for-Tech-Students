@@ -27,6 +27,7 @@ import com.devcollab.escrow.repository.MilestoneRepository;
 import com.devcollab.escrow.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -114,8 +115,13 @@ public class MilestoneService {
      * - Only SUBMITTED milestones can be approved
      * - Idempotency: if already in PAYMENT_PROCESSING or RELEASED, reject
      */
-    @Transactional
+        @Transactional
     public MilestoneResponse approveMilestone(UUID milestoneId, UUID approvedBy, String actor) {
+        return approveMilestone(milestoneId, approvedBy != null ? approvedBy.toString() : null, actor);
+    }
+
+    @Transactional
+    public MilestoneResponse approveMilestone(UUID milestoneId, String approvedBy, String actor) {
         Milestone milestone = findMilestoneOrThrow(milestoneId);
 
         // Idempotency check — reject if already approved/in-progress/released
@@ -306,12 +312,21 @@ public class MilestoneService {
         }
 
         // Update transaction
-        transactionRepository.findByProviderOrderId(providerOrderId).ifPresent(tx -> {
+        List<Transaction> txs = transactionRepository.findByMilestoneIdOrderByCreatedAtDesc(milestoneId);
+        if (!txs.isEmpty()) {
+            Transaction tx = txs.get(0);
             tx.setProviderPaymentId(providerPaymentId);
             tx.setStatus(TransactionStatus.SUCCESS);
             tx.setCompletedAt(Instant.now());
             transactionRepository.save(tx);
-        });
+        } else if (providerOrderId != null) {
+            transactionRepository.findByProviderOrderId(providerOrderId).ifPresent(tx -> {
+                tx.setProviderPaymentId(providerPaymentId);
+                tx.setStatus(TransactionStatus.SUCCESS);
+                tx.setCompletedAt(Instant.now());
+                transactionRepository.save(tx);
+            });
+        }
 
         // Release milestone
         milestone.setStatus(MilestoneStatus.RELEASED);

@@ -162,6 +162,8 @@ export const milestonesApi = {
     client.post(`/api/milestones/${id}/approve`),
   release: (id: string) =>
     client.post(`/api/milestones/${id}/release`),
+  complete: (id: string) =>
+    client.post(`/api/milestones/${id}/complete`),
 }
 
 export const transactionsApi = {

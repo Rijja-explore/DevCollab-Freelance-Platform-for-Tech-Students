@@ -5,7 +5,7 @@ import { TableSkeleton } from '../components/LoadingSkeleton'
 import { EmptyState } from '../components/EmptyState'
 import { Sparkles, CheckCircle, ArrowRight, DollarSign } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { ServiceHeader } from '../components/ServiceHeader'
 
@@ -35,22 +35,23 @@ export const Recommendations: React.FC = () => {
     execute: fetchRecommendations,
   } = useApi<any, [string]>(discoveryApi.getRecommendations)
 
+  const currentRole = ((user?.role || '') as string).toUpperCase()
+
   useEffect(() => {
-    if (user && user.role === 'STUDENT') {
-      // Get actual student ID from user context
-      const actualStudentId = user?.profileId || user?.id
-      if (actualStudentId) {
-        fetchRecommendations(actualStudentId)
+    if (currentRole === 'STUDENT' || currentRole === 'ADMIN') {
+      const studentId = user?.profileId || (currentRole === 'STUDENT' ? user?.id : '88bb3b37-30f0-3247-8994-0f583cdf59c3')
+      if (studentId) {
+        fetchRecommendations(studentId)
       }
     }
-  }, [user, fetchRecommendations])
+  }, [user, currentRole, fetchRecommendations])
 
   const recommendations: Recommendation[] = recsData?.data ?? (Array.isArray(recsData) ? recsData : [])
 
   const handleMatch = async (projectId: string) => {
     setMatchingId(projectId)
     try {
-      const actualStudentId = user?.profileId || user?.id
+      const actualStudentId = user?.profileId || (currentRole === 'STUDENT' ? user?.id : '88bb3b37-30f0-3247-8994-0f583cdf59c3')
       if (!actualStudentId) {
         toast.error('User profile not loaded')
         setMatchingId(null)
@@ -62,28 +63,23 @@ export const Recommendations: React.FC = () => {
       fetchRecommendations(actualStudentId)
       
       // Wait for workspace to be created via RabbitMQ
-      // Poll the workspace API until the new workspace appears
       let workspaceCreated = false
       let attempts = 0
-      const maxAttempts = 15 // 15 * 1 second = 15 seconds max wait
-      
-      console.log('Waiting for workspace creation from RabbitMQ...')
+      const maxAttempts = 15
       
       while (!workspaceCreated && attempts < maxAttempts) {
         attempts++
-        await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second between checks
+        await new Promise(resolve => setTimeout(resolve, 1000))
         
         try {
           const workspacesRes = await workspaceApi.getAll()
           const workspaces = workspacesRes.data?.data ?? workspacesRes.data ?? []
           
-          // Check if new workspace was created for this project
           const newWorkspace = Array.isArray(workspaces) && workspaces.find(
             (ws: any) => ws.projectId === projectId || ws.projectId?.toLowerCase() === projectId.toLowerCase()
           )
           
           if (newWorkspace) {
-            console.log('Workspace created successfully after', attempts, 'attempts')
             workspaceCreated = true
             toast.success('Workspace ready! Redirecting...')
           }
@@ -92,15 +88,6 @@ export const Recommendations: React.FC = () => {
         }
       }
       
-      if (!workspaceCreated) {
-        console.warn('Workspace not created after max attempts, navigating anyway')
-        toast('Workspace creation is taking longer than expected. It may appear shortly.', {
-  icon: '⚠️',
-})
-
-      }
-      
-      // Navigate to workspaces
       navigate('/workspaces')
     } catch (err: any) {
       console.error(err)
@@ -110,22 +97,8 @@ export const Recommendations: React.FC = () => {
     }
   }
 
-  if (user?.role !== 'STUDENT') {
-    return (
-      <div className="space-y-6">
-        <ServiceHeader
-          service="discovery"
-          title="AI-Powered Skill Matches"
-          subtitle="This page is only available for students."
-        />
-        <EmptyState
-          title="Not Authorized"
-          description="Only students can view project recommendations. Log in as a student to see AI-matched projects."
-          actionText="Browse All Projects"
-          onAction={() => navigate('/projects')}
-        />
-      </div>
-    )
+  if (currentRole !== 'STUDENT' && currentRole !== 'ADMIN') {
+    return <Navigate to="/dashboard" replace />
   }
 
   return (

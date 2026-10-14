@@ -72,11 +72,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const savedToken = localStorage.getItem('devcollab_token')
     const savedUserJson = localStorage.getItem('devcollab_user')
-    const savedRole = (localStorage.getItem('devcollab_role') as UserRole) || 'STARTUP'
+    const rawRole = localStorage.getItem('devcollab_role')
+    const savedRole: UserRole = rawRole
+      ? (rawRole.toUpperCase() as UserRole)
+      : 'STUDENT'
 
     if (savedToken && savedUserJson) {
       try {
         const parsedUser: UserProfile = JSON.parse(savedUserJson)
+        if (parsedUser.role) {
+          parsedUser.role = (parsedUser.role as string).toUpperCase() as UserRole
+        }
         setUser(parsedUser)
         setToken(savedToken)
       } catch {
@@ -85,24 +91,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } else if (savedToken) {
       setToken(savedToken)
+      const validRole = savedRole === 'STARTUP' || savedRole === 'ADMIN' ? savedRole : 'STUDENT'
       setUser({
-        id: 'user-' + savedRole.toLowerCase(),
-        email: DEFAULT_USERS[savedRole].email,
-        name: DEFAULT_USERS[savedRole].name,
-        role: savedRole,
-        headline: DEFAULT_USERS[savedRole].headline,
-        skills: DEFAULT_USERS[savedRole].skills,
+        id: 'user-' + validRole.toLowerCase(),
+        email: DEFAULT_USERS[validRole].email,
+        name: DEFAULT_USERS[validRole].name,
+        role: validRole,
+        headline: DEFAULT_USERS[validRole].headline,
+        skills: DEFAULT_USERS[validRole].skills,
       })
     }
     setIsLoading(false)
   }, [])
 
   const persistAuth = (tokenVal: string, userObj: UserProfile) => {
+    const normalizedRole = ((userObj.role || 'STUDENT') as string).toUpperCase() as UserRole
+    const normalizedUser = { ...userObj, role: normalizedRole }
     localStorage.setItem('devcollab_token', tokenVal)
-    localStorage.setItem('devcollab_role', userObj.role)
-    localStorage.setItem('devcollab_user', JSON.stringify(userObj))
+    localStorage.setItem('devcollab_role', normalizedRole)
+    localStorage.setItem('devcollab_user', JSON.stringify(normalizedUser))
     setToken(tokenVal)
-    setUser(userObj)
+    setUser(normalizedUser)
   }
 
   const login = async (email: string, _password?: string) => {
@@ -110,7 +119,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await authApi.login(email)
       const data = res.data
-      const role = (data.role as UserRole) || 'STARTUP'
+      const rawRole = ((data.role || '') as string).toUpperCase()
+      const role: UserRole = (rawRole === 'STUDENT' || rawRole === 'STARTUP' || rawRole === 'ADMIN')
+        ? (rawRole as UserRole)
+        : (email.toLowerCase().includes('student') || email.toLowerCase().includes('alex') ? 'STUDENT' : email.toLowerCase().includes('admin') ? 'ADMIN' : 'STARTUP')
+
       const userProfile: UserProfile = {
         id: data.userId || 'user-' + Date.now(),
         email: data.email || email,
@@ -125,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       persistAuth(data.token || data.accessToken, userProfile)
       toast.success(`Welcome back, ${userProfile.name}!`)
     } catch {
-      const role: UserRole = email.toLowerCase().includes('student') ? 'STUDENT' : email.toLowerCase().includes('admin') ? 'ADMIN' : 'STARTUP'
+      const role: UserRole = (email.toLowerCase().includes('student') || email.toLowerCase().includes('alex')) ? 'STUDENT' : email.toLowerCase().includes('admin') ? 'ADMIN' : 'STARTUP'
       const demo = DEFAULT_USERS[role]
       const fallbackToken = 'devcollab-jwt-' + Math.random().toString(36).substring(2)
       const userProfile: UserProfile = {

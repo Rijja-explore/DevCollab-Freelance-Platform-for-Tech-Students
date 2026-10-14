@@ -11,6 +11,7 @@ import {
   GraduationCap,
   Briefcase,
   ShieldCheck,
+  UserPlus,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -41,6 +42,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const navigate = useNavigate()
   const { user, role, logout } = useAuth()
   const [profileOpen, setProfileOpen] = useState(false)
+
+  const normalizedRole = ((role || user?.role || 'STUDENT') as string).toUpperCase()
 
   const handleLogout = () => {
     logout()
@@ -90,12 +93,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
       <div className="flex items-center gap-3">
         {/* Verified Static Role Badge (No dropdown switching once registered) */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
-          {role === 'STUDENT' ? (
+          {normalizedRole === 'STUDENT' ? (
             <>
               <GraduationCap className="w-4 h-4 text-emerald-400" />
               <span className="text-xs font-semibold text-emerald-300">Student Developer</span>
             </>
-          ) : role === 'STARTUP' ? (
+          ) : normalizedRole === 'STARTUP' ? (
             <>
               <Briefcase className="w-4 h-4 text-brand-400" />
               <span className="text-xs font-semibold text-brand-300">Startup Founder</span>
@@ -152,7 +155,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
               >
                 <User className="w-3.5 h-3.5 text-brand-400" /> My Profile
               </Link>
-              {role === 'ADMIN' && (
+              <Link
+                to="/register"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+              >
+                <UserPlus className="w-3.5 h-3.5 text-emerald-400" /> Create New Account
+              </Link>
+              {normalizedRole === 'ADMIN' && (
                 <Link
                   to="/settings"
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-white/5 hover:text-white transition-colors"

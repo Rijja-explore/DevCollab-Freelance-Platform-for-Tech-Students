@@ -43,7 +43,9 @@ const App: React.FC = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
         <Route path="/payment/cancel" element={<PaymentCancel />} />
+        <Route path="/payment-cancel" element={<PaymentCancel />} />
 
         {/* Protected Dashboard & Microservice Modules */}
         <Route
@@ -119,7 +121,7 @@ const App: React.FC = () => {
         <Route
           path="/recommendations"
           element={
-            <ProtectedRoute allowedRoles={['STUDENT', 'STARTUP', 'ADMIN']}>
+            <ProtectedRoute allowedRoles={['STUDENT', 'ADMIN']}>
               <Layout>
                 <Recommendations />
               </Layout>
@@ -169,7 +171,7 @@ const App: React.FC = () => {
         <Route
           path="/milestones"
           element={
-            <ProtectedRoute allowedRoles={['STARTUP', 'ADMIN']}>
+            <ProtectedRoute allowedRoles={['STARTUP', 'STUDENT', 'ADMIN']}>
               <Layout>
                 <Milestones />
               </Layout>
@@ -179,7 +181,7 @@ const App: React.FC = () => {
         <Route
           path="/transactions"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['STARTUP', 'ADMIN']}>
               <Layout>
                 <Transactions />
               </Layout>
@@ -189,7 +191,7 @@ const App: React.FC = () => {
         <Route
           path="/payments"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['STARTUP', 'ADMIN']}>
               <Layout>
                 <Transactions />
               </Layout>
@@ -199,7 +201,7 @@ const App: React.FC = () => {
         <Route
           path="/transactions/:id"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['STARTUP', 'ADMIN']}>
               <Layout>
                 <PaymentDetails />
               </Layout>
@@ -239,7 +241,7 @@ const App: React.FC = () => {
         <Route
           path="/settings"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['ADMIN']}>
               <Layout>
                 <Settings />
               </Layout>
@@ -248,7 +250,7 @@ const App: React.FC = () => {
         />
 
         {/* Fallback Catch-All */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>
   )

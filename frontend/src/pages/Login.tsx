@@ -170,6 +170,17 @@ export const Login: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
+
+          <div className="pt-4 border-t border-white/10 text-center space-y-2.5">
+            <p className="text-xs text-slate-400">Need a brand new custom account?</p>
+            <Link
+              to="/register"
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-semibold text-xs transition-all shadow-sm"
+            >
+              <Users className="w-4 h-4 text-brand-400" />
+              <span>Create New Account (Student or Startup)</span>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

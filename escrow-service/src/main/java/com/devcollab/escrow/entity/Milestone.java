@@ -57,9 +57,8 @@ public class Milestone {
     @Column(name = "due_date")
     private LocalDate dueDate;
 
-    @JdbcTypeCode(SqlTypes.VARCHAR)
-    @Column(name = "approved_by", columnDefinition = "CHAR(36)")
-    private UUID approvedBy;
+    @Column(name = "approved_by", length = 100)
+    private String approvedBy;
 
     @Column(name = "approved_at")
     private Instant approvedAt;

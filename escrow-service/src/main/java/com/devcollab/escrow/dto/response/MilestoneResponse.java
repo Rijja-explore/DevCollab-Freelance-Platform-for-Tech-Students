@@ -23,7 +23,7 @@ public class MilestoneResponse {
     private Integer sequenceOrder;
     private MilestoneStatus status;
     private LocalDate dueDate;
-    private UUID approvedBy;
+    private String approvedBy;
     private Instant approvedAt;
     private Instant releasedAt;
     private String idempotencyKey;

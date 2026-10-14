@@ -95,8 +95,8 @@ public class PayPalPaymentService implements PaymentService {
 
             // amount
             ObjectNode amountNode = unit.putObject("amount");
-            amountNode.put("currency_code", request.getCurrency() != null
-                    ? request.getCurrency() : defaultCurrency);
+            String safeCurrency = resolvePayPalCurrency(request.getCurrency());
+            amountNode.put("currency_code", safeCurrency);
             amountNode.put("value", request.getAmount().setScale(2, RoundingMode.HALF_UP).toPlainString());
 
             ObjectNode applicationContext = body.putObject("application_context");
@@ -140,7 +140,7 @@ public class PayPalPaymentService implements PaymentService {
 
             // Extract amount back
             BigDecimal amount = request.getAmount();
-            String currency = request.getCurrency() != null ? request.getCurrency() : defaultCurrency;
+            String currency = safeCurrency;
 
             log.info("PayPal order created: {} (status {})", orderId, status);
 
@@ -254,11 +254,19 @@ public class PayPalPaymentService implements PaymentService {
         return lower.contains("placeholder") || lower.startsWith("adbh8s");
     }
 
+    private String resolvePayPalCurrency(String requestedCurrency) {
+        if (requestedCurrency == null || requestedCurrency.isBlank() || "INR".equalsIgnoreCase(requestedCurrency)) {
+            return (defaultCurrency != null && !defaultCurrency.isBlank() && !"INR".equalsIgnoreCase(defaultCurrency))
+                    ? defaultCurrency : "USD";
+        }
+        return requestedCurrency.toUpperCase();
+    }
+
     private PaymentResult buildSandboxDemoOrder(PaymentRequest request) {
         String orderId = "SANDBOX_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         String approveUrl = "https://www.sandbox.paypal.com/checkoutnow?token=" + orderId;
         BigDecimal amount = request.getAmount() != null ? request.getAmount() : BigDecimal.ZERO;
-        String currency = request.getCurrency() != null ? request.getCurrency() : defaultCurrency;
+        String currency = resolvePayPalCurrency(request.getCurrency());
 
         log.info("Sandbox demo PayPal order created: {}", orderId);
         return PaymentResult.builder()

@@ -63,7 +63,7 @@ public class Contract {
 
     @Column(name = "currency", nullable = false, length = 3)
     @Builder.Default
-    private String currency = "INR";
+    private String currency = "USD";
 
     @Column(name = "terms", columnDefinition = "TEXT")
     private String terms;

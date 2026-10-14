@@ -52,7 +52,7 @@ public class Transaction {
 
     @Column(name = "currency", nullable = false, length = 3)
     @Builder.Default
-    private String currency = "INR";
+    private String currency = "USD";
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)

@@ -6,7 +6,6 @@ import {
   Handshake,
   FolderGit2,
   FileText,
-  DollarSign,
   CreditCard,
   Bell,
   User,
@@ -18,6 +17,7 @@ import {
   Code2,
   Sparkles,
   LogOut,
+  UserPlus,
   X,
   LucideIcon,
 } from 'lucide-react'
@@ -50,47 +50,46 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     navigate('/login')
   }
 
+  const normalizedRole = ((role || user?.role || 'STUDENT') as string).toUpperCase()
+
   // Define role-specific navigation lists strictly matching the user architecture
   const getNavSections = (): NavSection[] => {
-    if (role === 'STUDENT') {
+    if (normalizedRole === 'STUDENT') {
       return [
         {
           title: 'Student Navigation',
           items: [
             { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview & metrics' },
             { to: '/projects', label: 'Discover Projects', icon: Search, desc: 'Search & matching' },
-            { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Skill-matched gigs' },
+            { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Skill-matched gigs & gaps' },
             { to: '/applications', label: 'My Applications', icon: Handshake, desc: 'Applied gigs & status' },
             { to: '/workspaces', label: 'My Collaborations', icon: FolderGit2, desc: 'Live chat & code review' },
             { to: '/contracts', label: 'My Contracts', icon: FileText, desc: 'Escrow agreements' },
-            { to: '/transactions', label: 'Payments', icon: DollarSign, desc: 'Earnings & payouts' },
           ],
         },
         {
           title: 'Account',
           items: [
             { to: '/notifications', label: 'Notifications', icon: Bell, desc: 'System updates' },
-            { to: '/profile', label: 'Profile', icon: User, desc: 'Developer skills & rate' },
-            { to: '/settings', label: 'Settings', icon: Settings, desc: 'Preferences & security' },
+            { to: '/profile', label: 'Developer Profile', icon: User, desc: 'Skills, hourly rate & portfolio' },
           ],
         },
       ]
     }
 
-    if (role === 'STARTUP') {
+    if (normalizedRole === 'STARTUP') {
       return [
         {
           title: 'Startup Navigation',
           items: [
             { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Hires & budget overview' },
             { to: '/projects', label: 'My Projects', icon: Briefcase, desc: 'Post & manage gigs' },
-            { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Skill-matched talent' },
             { to: '/talent', label: 'Find Talent', icon: Search, desc: 'Student developers' },
             { to: '/applicants', label: 'Applicants', icon: Users, desc: 'Review & match talent' },
             { to: '/workspaces', label: 'Collaborations', icon: FolderGit2, desc: 'Workspaces & code reviews' },
             { to: '/contracts', label: 'Contracts', icon: FileText, desc: 'Escrow agreements' },
-            { to: '/milestones', label: 'Milestones', icon: Milestone, desc: 'PayPal checkout & release' },
-            { to: '/transactions', label: 'Payments', icon: CreditCard, desc: 'Escrow deposit ledger' },
+            { to: '/milestones', label: 'Milestones & Escrow', icon: Milestone, desc: 'PayPal checkout & release' },
+            { to: '/transactions', label: 'Payment Ledger', icon: CreditCard, desc: 'Escrow deposit records' },
           ],
         },
         {
@@ -98,41 +97,54 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           items: [
             { to: '/notifications', label: 'Notifications', icon: Bell, desc: 'System updates' },
             { to: '/profile', label: 'Company Profile', icon: User, desc: 'Startup info & projects' },
-            { to: '/settings', label: 'Settings', icon: Settings, desc: 'Preferences & security' },
           ],
         },
       ]
     }
 
-    // Default ADMIN Navigation
+    if (normalizedRole === 'ADMIN') {
+      return [
+        {
+          title: 'Platform Overview',
+          items: [
+            { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'System telemetry' },
+            { to: '/projects', label: 'Projects Catalog', icon: Search, desc: 'All platform listings' },
+            { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Matching algorithm' },
+            { to: '/talent', label: 'Find Talent', icon: Search, desc: 'All student developers' },
+            { to: '/applicants', label: 'Applicants', icon: Users, desc: 'All applications' },
+            { to: '/workspaces', label: 'Workspaces', icon: FolderGit2, desc: 'Active rooms' },
+          ],
+        },
+        {
+          title: 'Fintech & Security',
+          items: [
+            { to: '/contracts', label: 'Contracts', icon: FileText, desc: 'All contracts' },
+            { to: '/milestones', label: 'Milestones', icon: Milestone, desc: 'Milestone tracker' },
+            { to: '/transactions', label: 'Transactions', icon: CreditCard, desc: 'Ledger records' },
+            { to: '/audit-logs', label: 'Security Audit', icon: ShieldCheck, desc: 'Traceability trail' },
+            { to: '/graphql-explorer', label: 'GraphQL API', icon: Code2, desc: 'Schema explorer' },
+          ],
+        },
+        {
+          title: 'System & Account',
+          items: [
+            { to: '/notifications', label: 'Notifications', icon: Bell, desc: 'Event activity' },
+            { to: '/profile', label: 'Profile', icon: User, desc: 'Admin account' },
+            { to: '/settings', label: 'System Settings', icon: Settings, desc: 'RS256 & topology' },
+          ],
+        },
+      ]
+    }
+
+    // Safe fallback for unauthenticated or unexpected roles: Student view, NEVER Admin
     return [
       {
-        title: 'Platform Overview',
+        title: 'Student Navigation',
         items: [
-          { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'System telemetry' },
-          { to: '/projects', label: 'Projects Catalog', icon: Search, desc: 'All projects' },
-          { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Matching algorithm' },
-          { to: '/talent', label: 'Find Talent', icon: Search, desc: 'All students' },
-          { to: '/applicants', label: 'Applicants', icon: Users, desc: 'All applications' },
-          { to: '/workspaces', label: 'Workspaces', icon: FolderGit2, desc: 'Active rooms' },
-        ],
-      },
-      {
-        title: 'Fintech & Security',
-        items: [
-          { to: '/contracts', label: 'Contracts', icon: FileText, desc: 'All contracts' },
-          { to: '/milestones', label: 'Milestones', icon: Milestone, desc: 'Milestone tracker' },
-          { to: '/transactions', label: 'Transactions', icon: CreditCard, desc: 'Ledger records' },
-          { to: '/audit-logs', label: 'Security Audit', icon: ShieldCheck, desc: 'Traceability trail' },
-          { to: '/graphql-explorer', label: 'GraphQL API', icon: Code2, desc: 'Schema explorer' },
-        ],
-      },
-      {
-        title: 'Account',
-        items: [
-          { to: '/notifications', label: 'Notifications', icon: Bell, desc: 'Event activity' },
-          { to: '/profile', label: 'Profile', icon: User, desc: 'Admin account' },
-          { to: '/settings', label: 'System Settings', icon: Settings, desc: 'RS256 & topology' },
+          { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview & metrics' },
+          { to: '/projects', label: 'Discover Projects', icon: Search, desc: 'Search & matching' },
+          { to: '/applications', label: 'My Applications', icon: Handshake, desc: 'Applied gigs' },
+          { to: '/workspaces', label: 'My Collaborations', icon: FolderGit2, desc: 'Live workspaces' },
         ],
       },
     ]
@@ -160,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           <div>
             <h1 className="font-bold text-white text-lg tracking-tight">DevCollab</h1>
             <span className="text-[10px] text-brand-400 font-semibold tracking-widest uppercase">
-              {role === 'STUDENT' ? 'Student Portal' : role === 'STARTUP' ? 'Startup Portal' : 'Admin Console'}
+              {normalizedRole === 'STUDENT' ? 'Student Portal' : normalizedRole === 'STARTUP' ? 'Startup Portal' : 'Admin Console'}
             </span>
           </div>
         </NavLink>
@@ -239,19 +251,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 {user?.name || 'DevCollab Member'}
               </div>
               <div className="text-[10px] text-slate-400 truncate">
-                {role}
+                {normalizedRole}
               </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
-            title="Sign Out"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <NavLink
+              to="/register"
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+              title="Create New Account"
+            >
+              <UserPlus className="w-4 h-4" />
+            </NavLink>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </aside>

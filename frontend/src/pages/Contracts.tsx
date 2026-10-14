@@ -6,7 +6,6 @@ import { EmptyState } from '../components/EmptyState';
 import { StatusBadge } from '../components/StatusBadge';
 import { format } from 'date-fns';
 import {
-  Plus,
   X,
   Search,
   Calendar,
@@ -21,7 +20,7 @@ import { ServiceHeader } from '../components/ServiceHeader';
 import toast from 'react-hot-toast';
 
 export const Contracts: React.FC = () => {
-  const { role, user } = useAuth();
+  const { user } = useAuth();
 
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
@@ -203,17 +202,6 @@ export const Contracts: React.FC = () => {
         service="escrow"
         title="Escrow Contracts"
         subtitle="Manage legally-binding freelance agreements with automated milestone funding and PayPal Sandbox escrow vault."
-        action={
-          role === 'STARTUP' || role === 'ADMIN' ? (
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn-primary"
-            >
-              <Plus className="w-4 h-4" />
-              Create Contract
-            </button>
-          ) : undefined
-        }
       />
 
       {/* Filter and Search Bar */}
@@ -237,17 +225,7 @@ export const Contracts: React.FC = () => {
       ) : filteredContracts.length === 0 ? (
         <EmptyState
           title="No contracts found"
-          description="Matched projects generate escrow agreements automatically, or startup founders can create one manually."
-          actionText={
-            role === 'STARTUP' || role === 'ADMIN'
-              ? 'Create Contract'
-              : undefined
-          }
-          onAction={
-            role === 'STARTUP' || role === 'ADMIN'
-              ? () => setShowCreateModal(true)
-              : undefined
-          }
+          description="Contracts and milestones are created automatically as soon as an application is submitted."
         />
       ) : (
         <div className="card overflow-hidden">
