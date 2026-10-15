@@ -18,7 +18,8 @@ public final class SkillGapTypes {
     public record CourseRecommendation(String courseId, String title, String skill,
                                        String provider, double durationHours, double price,
                                        String currency, String difficulty, String url,
-                                       String reason, double score) {
+                                       String reason, double score, String resourceType,
+                                       long viewCount, int itemCount) {
     }
 
     public record SkillGapAnalysis(String studentId, String projectId, String projectTitle,

@@ -65,6 +65,9 @@ type CourseRecommendation {
     url: String!
     reason: String!
     score: Float!
+    resourceType: String!
+    viewCount: Float!
+    itemCount: Int!
 }
 
 input CreateProjectInput {

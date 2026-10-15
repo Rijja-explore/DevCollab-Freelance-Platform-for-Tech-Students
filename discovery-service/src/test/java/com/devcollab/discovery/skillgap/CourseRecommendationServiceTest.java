@@ -14,34 +14,33 @@ class CourseRecommendationServiceTest {
     void ranksFastApiCoursesByFormula() {
         var recommendations = service.recommend(List.of("FastAPI"));
 
-        assertEquals(List.of("course-002", "course-001"), recommendations.stream()
+        assertEquals(List.of("course-002"), recommendations.stream()
                 .map(SkillGapTypes.CourseRecommendation::courseId).toList());
         assertEquals(98.0, recommendations.get(0).score());
-        assertEquals(65.0, recommendations.get(1).score());
     }
 
     @Test
     void ranksDockerCoursesByComputedScore() {
         var recommendations = service.recommend(List.of("Docker"));
 
-        assertEquals(List.of("course-003", "course-004"), recommendations.stream()
+        assertEquals(List.of("course-003"), recommendations.stream()
                 .map(SkillGapTypes.CourseRecommendation::courseId).toList());
         assertTrue(recommendations.get(0).reason().contains("free"));
     }
 
     @Test
-    void ignoresUnsupportedSkillsAndCapsRecommendations() {
+    void providesOneRecommendationForEachMissingSkill() {
         var recommendations = service.recommend(List.of("COBOL", "FastAPI", "Docker", "Kubernetes"));
 
-        assertEquals(5, recommendations.size());
-        assertTrue(recommendations.stream().noneMatch(course -> course.skill().equalsIgnoreCase("COBOL")));
+        assertEquals(4, recommendations.size());
+        assertTrue(recommendations.stream().anyMatch(course -> course.skill().equalsIgnoreCase("COBOL")));
     }
 
     @Test
-    void sortsTheCappedRecommendationsGloballyByScore() {
+    void providesOneRecommendationPerSkill() {
         var recommendations = service.recommend(List.of("Docker", "FastAPI"));
 
-        assertEquals(List.of("course-003", "course-002", "course-004", "course-001"), recommendations.stream()
+        assertEquals(List.of("course-003", "course-002"), recommendations.stream()
                 .map(SkillGapTypes.CourseRecommendation::courseId).toList());
     }
 }

@@ -117,7 +117,9 @@ export const discoveryApi = {
             difficulty
             url
             reason
-            score
+            resourceType
+            viewCount
+            itemCount
           }
         }
       }`,

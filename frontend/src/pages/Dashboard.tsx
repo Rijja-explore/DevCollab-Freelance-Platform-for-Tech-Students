@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import {
   FolderGit2,
-  CheckCircle,
   DollarSign,
   ArrowRight,
   ShieldCheck,
@@ -331,9 +330,9 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Real Recent Projects & Quick Action Panes */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 ${role === 'ADMIN' ? 'lg:grid-cols-3' : ''} gap-6`}>
         {/* Left 2 Cols: Recent Projects */}
-        <div className="lg:col-span-2 p-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl shadow-2xl space-y-4">
+        <div className={`${role === 'ADMIN' ? 'lg:col-span-2' : ''} p-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl shadow-2xl space-y-4`}>
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
             <div>
               <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -394,19 +393,19 @@ export const Dashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Right 1 Col: Role Insights / Admin Audit */}
-        <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl shadow-2xl space-y-4">
+        {/* Right 1 Col: Admin Audit */}
+        {role === 'ADMIN' && <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl shadow-2xl space-y-4">
           <div className="pb-3 border-b border-white/10">
             <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <Activity className="w-4 h-4 text-emerald-400" />
-              {role === 'ADMIN' ? 'Security Audit Activity' : 'Ecosystem Overview'}
+              Security Audit Activity
             </h2>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              {role === 'ADMIN' ? 'Immutable append-only ledger' : 'Microservices connected via RabbitMQ'}
+              Immutable append-only ledger
             </p>
           </div>
 
-          {role === 'ADMIN' && recentLogs.length > 0 ? (
+          {recentLogs.length > 0 ? (
             <div className="space-y-3">
               {recentLogs.map((log, idx) => (
                 <div key={idx} className="p-3 rounded-xl bg-white/5 border border-white/5 text-xs space-y-1">
@@ -419,28 +418,9 @@ export const Dashboard: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Service 1: Discovery</div>
-                <div className="text-xs text-emerald-400 font-semibold flex items-center gap-1.5">
-                  <CheckCircle className="w-3.5 h-3.5" /> Spring Boot + Postgres + ES (Port 8081)
-                </div>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Service 2: Workspace</div>
-                <div className="text-xs text-emerald-400 font-semibold flex items-center gap-1.5">
-                  <CheckCircle className="w-3.5 h-3.5" /> Node.js 18 + MongoDB + WebSockets (Port 5000)
-                </div>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Service 3: Escrow</div>
-                <div className="text-xs text-emerald-400 font-semibold flex items-center gap-1.5">
-                  <CheckCircle className="w-3.5 h-3.5" /> Spring Boot + MySQL + PayPal Sandbox (Port 8080)
-                </div>
-              </div>
-            </div>
+            <p className="text-xs text-slate-500">No audit activity yet.</p>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   )
