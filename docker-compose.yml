@@ -80,7 +80,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-escrow_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-escrow_pass}
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_escrow_data:/var/lib/mysql
     command: >
