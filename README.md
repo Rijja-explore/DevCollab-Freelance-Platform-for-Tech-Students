@@ -1,8 +1,7 @@
 # DevCollab — Freelance Platform for Tech Students
 
 > **Microservices Freelancing & Collaboration Ecosystem**  
-> Architecture compliant with the DevCollab System Specification: independent deployments, database-per-service isolation, event-driven orchestration, RS256 JWT security, real-time WebSockets, and integrated PayPal Sandbox Escrow.
-
+> Architecture compliant with the DevCollab System Specification: independent deployments, database-per-service isolation, event-driven orchestration, RS256 JWT security, real-time WebSockets, and integrated PayPal Sandbox Escrow . 
 ---
 
 ## 🏛️ System Architecture
