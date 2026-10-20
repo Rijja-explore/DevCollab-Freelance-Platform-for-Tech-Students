@@ -152,6 +152,68 @@ export const workspaceApi = {
     client.get(`/api/comments/${workspaceId}`),
   addComment: (workspaceId: string, content: string, lineNumber?: number, fileSnippet?: string) =>
     client.post(`/api/comments/${workspaceId}`, { content, lineNumber, fileSnippet }),
+  replyToComment: (commentId: string, text: string) =>
+    client.post(`/api/comments/${commentId}/reply`, { text }),
+
+  // ── GitHub Code Review ─────────────────────────────────────────────────────
+  // All calls go through the backend — GITHUB_TOKEN is never exposed to the browser.
+  github: {
+    /** Get linked repo info, or { linked: false } if none is set. */
+    getRepo: (workspaceId: string) =>
+      client.get(`/api/workspaces/${workspaceId}/github/repo`),
+
+    /** Link (or re-link) a GitHub repository to this workspace. */
+    linkRepo: (workspaceId: string, githubOwner: string, githubRepo: string) =>
+      client.put(`/api/workspaces/${workspaceId}/github/repo`, { githubOwner, githubRepo }),
+
+    /** List files/folders at `path` (defaults to repo root). */
+    listFiles: (workspaceId: string, path = '', ref?: string) => {
+      const params = new URLSearchParams()
+      if (path) params.append('path', path)
+      if (ref)  params.append('ref', ref)
+      const qs = params.toString()
+      return client.get(`/api/workspaces/${workspaceId}/github/files${qs ? `?${qs}` : ''}`)
+    },
+
+    /** Fetch decoded content of a single file. */
+    getFile: (workspaceId: string, filePath: string, ref?: string) => {
+      const params = new URLSearchParams({ path: filePath })
+      if (ref) params.append('ref', ref)
+      return client.get(`/api/workspaces/${workspaceId}/github/file?${params}`)
+    },
+
+    /** Create a new file in the linked repository. */
+    createFile: (
+      workspaceId: string,
+      path: string,
+      content: string,
+      message?: string,
+      branch?: string,
+    ) =>
+      client.post(`/api/workspaces/${workspaceId}/github/file`, {
+        path,
+        content,
+        message,
+        branch,
+      }),
+
+    /** Update an existing file (sha of current blob required). */
+    updateFile: (
+      workspaceId: string,
+      path: string,
+      content: string,
+      sha: string,
+      message?: string,
+      branch?: string,
+    ) =>
+      client.put(`/api/workspaces/${workspaceId}/github/file`, {
+        path,
+        content,
+        sha,
+        message,
+        branch,
+      }),
+  },
 }
 
 // ─── Escrow & Milestone Service API ───────────────────────────────────────────

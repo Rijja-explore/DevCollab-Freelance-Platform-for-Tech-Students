@@ -68,6 +68,27 @@ const workspaceSchema = new Schema({
     },
     default: DEFAULT_WORKSPACE_STATUS,
     required: true
+  },
+
+  // ── GitHub Code Review Integration (optional) ──────────────────────────────
+  // GitHub repository owner (username or organisation) linked to this workspace.
+  // Example: "acme-corp"
+  // Not required — workspaces created before this feature have no linked repo.
+  githubOwner: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'GitHub owner cannot exceed 100 characters'],
+    default: null
+  },
+
+  // GitHub repository name linked to this workspace.
+  // Example: "project-backend"
+  // Not required — same rationale as githubOwner.
+  githubRepo: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'GitHub repo name cannot exceed 100 characters'],
+    default: null
   }
 }, {
   // Enable automatic timestamps
