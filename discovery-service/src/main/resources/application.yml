@@ -71,6 +71,9 @@ jwt:
   private-key-path: classpath:keys/private.pem
   public-key-path: classpath:keys/public.pem
 
+youtube:
+  api-key: ${YOUTUBE_API_KEY:}
+
 events:
   exchange: devcollab.events
   routing-key:

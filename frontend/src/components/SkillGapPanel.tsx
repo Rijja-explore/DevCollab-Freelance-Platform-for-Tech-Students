@@ -21,7 +21,9 @@ export interface SkillGapAnalysis {
     difficulty: string
     url: string
     reason: string
-    score: number
+    resourceType: string
+    viewCount: number
+    itemCount: number
   }>
 }
 
@@ -119,7 +121,7 @@ export const SkillGapPanel: React.FC<SkillGapPanelProps> = ({ analysis, onClose 
         <div className="space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Recommended learning</h3>
           {analysis.recommendations.length === 0 ? (
-            <p className="text-xs text-slate-500">No catalog course matches the missing skills yet.</p>
+            <p className="text-xs text-slate-500">No learning resources match the missing skills yet.</p>
           ) : (
             <div className="space-y-2">
               {analysis.recommendations.map((course) => (
@@ -131,12 +133,10 @@ export const SkillGapPanel: React.FC<SkillGapPanelProps> = ({ analysis, onClose 
                         <h4 className="text-xs font-bold text-white">{course.title}</h4>
                         <ExternalLink className="w-3 h-3 text-slate-500" />
                       </div>
-                      <p className="mt-1 text-[11px] text-slate-400">{course.provider} · {course.difficulty} · {course.durationHours}h · {course.price === 0 ? 'Free' : `${course.currency} ${course.price}`}</p>
+                      <p className="mt-1 text-[11px] text-slate-400">{course.provider} · {course.resourceType} · {course.difficulty} · {course.price === 0 ? 'Free' : `${course.currency} ${course.price}`}</p>
+                      <p className="mt-1 text-[11px] text-brand-300/80">Covers: {course.skill}</p>
                     </div>
-                    <span className="text-xs font-bold text-brand-300">Score {course.score.toFixed(0)}</span>
                   </div>
-                  <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{course.reason}</p>
-                  <p className="mt-2 text-[10px] uppercase tracking-wider text-brand-300/70">Open official learning resource</p>
                 </a>
               ))}
             </div>

@@ -80,7 +80,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-escrow_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-escrow_pass}
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_escrow_data:/var/lib/mysql
     command: >
@@ -128,6 +128,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-discovery:5432/${POSTGRES_DB:-devcollab_discovery}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379

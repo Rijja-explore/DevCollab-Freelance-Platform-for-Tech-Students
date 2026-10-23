@@ -19,6 +19,7 @@ public class AuthController {
 
     private final JwtTokenService jwtTokenService;
     private final StudentProfileRepository studentProfileRepository;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @GetMapping("/.well-known/jwks.json")
     public ResponseEntity<Map<String, Object>> getJwks() {
@@ -74,19 +75,58 @@ public class AuthController {
     @PostMapping("/api/auth/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request) {
         String email = request.getEmail() != null ? request.getEmail().trim() : "";
-        String role = "STARTUP";
-        if (email.toLowerCase().contains("student") || email.toLowerCase().contains("alex") || email.toLowerCase().contains("riya")) {
-            role = "STUDENT";
-        } else if (email.toLowerCase().contains("admin")) {
-            role = "ADMIN";
+        String userId = UUID.nameUUIDFromBytes(email.getBytes()).toString();
+        String role = null;
+        String name = null;
+
+        // 1. Try to find user in auth_user table
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, email, first_name, last_name, role FROM auth_user WHERE LOWER(email) = LOWER(?)",
+                email
+            );
+            if (!rows.isEmpty()) {
+                Map<String, Object> row = rows.get(0);
+                role = (String) row.get("role");
+                String fn = (String) row.get("first_name");
+                String ln = (String) row.get("last_name");
+                name = (fn != null ? fn : "") + (ln != null && !ln.isBlank() ? " " + ln : "");
+                name = name.trim();
+                if (row.get("id") != null) {
+                    userId = row.get("id").toString();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not query auth_user: {}", e.getMessage());
         }
 
-        String name = "DevCollab Member";
-        if (role.equals("STUDENT")) name = "Alex Chen";
-        else if (role.equals("STARTUP")) name = "Apex Innovators";
-        else if (role.equals("ADMIN")) name = "System Administrator";
+        // 2. Check if a student profile exists for this userId
+        if (role == null) {
+            Optional<StudentProfile> studentOpt = studentProfileRepository.findByUserId(userId);
+            if (studentOpt.isPresent()) {
+                role = "STUDENT";
+                name = studentOpt.get().getFullName();
+            }
+        }
 
-        String userId = UUID.nameUUIDFromBytes(email.getBytes()).toString();
+        // 3. Fallback heuristics if not found in db
+        if (role == null) {
+            if (email.toLowerCase().contains("student") || email.toLowerCase().contains("alex") || email.toLowerCase().contains("riya")) {
+                role = "STUDENT";
+            } else if (email.toLowerCase().contains("admin")) {
+                role = "ADMIN";
+            } else {
+                role = "STARTUP";
+            }
+        }
+
+        if (name == null || name.isBlank()) {
+            if ("STUDENT".equals(role)) name = "Alex Chen";
+            else if ("STARTUP".equals(role)) name = "Apex Innovators";
+            else if ("ADMIN".equals(role)) name = "System Administrator";
+            else name = "DevCollab Member";
+        }
+
         String token = jwtTokenService.generateToken(userId, email, role, name);
 
         Map<String, Object> response = new HashMap<>();
@@ -116,6 +156,19 @@ public class AuthController {
         String role = request.getRole() != null ? request.getRole().toUpperCase().trim() : "STUDENT";
         String name = request.getName() != null && !request.getName().isBlank() ? request.getName().trim() : "New User";
         String userId = UUID.nameUUIDFromBytes(email.getBytes()).toString();
+
+        // Persist to auth_user table so subsequent logins preserve this exact role
+        try {
+            jdbcTemplate.update(
+                "INSERT INTO auth_user (id, email, password, first_name, last_name, role, status) " +
+                "VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE') " +
+                "ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name",
+                userId, email.toLowerCase(), request.getPassword() != null ? request.getPassword() : "nopass",
+                name, "", role
+            );
+        } catch (Exception e) {
+            log.warn("Could not save to auth_user table: {}", e.getMessage());
+        }
 
         String token = jwtTokenService.generateToken(userId, email, role, name);
 

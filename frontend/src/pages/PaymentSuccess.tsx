@@ -1,24 +1,45 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, ArrowRight, ShieldCheck, FileText } from 'lucide-react'
+import { CheckCircle2, ArrowRight, ShieldCheck, FileText, Loader2 } from 'lucide-react'
+import { transactionsApi } from '../api/client'
+import toast from 'react-hot-toast'
 
 export const PaymentSuccess: React.FC = () => {
   const [searchParams] = useSearchParams()
+  const transactionId = searchParams.get('transactionId')
   const token = searchParams.get('token') || searchParams.get('orderId') || 'SANDBOX-' + Math.random().toString(36).substring(2, 10).toUpperCase()
   const PayerID = searchParams.get('PayerID') || 'PAYER-' + Math.random().toString(36).substring(2, 8).toUpperCase()
+  const [capturing, setCapturing] = useState<boolean>(Boolean(transactionId))
+
+  useEffect(() => {
+    if (transactionId) {
+      transactionsApi.capture(transactionId)
+        .then(() => {
+          toast.success('Escrow payment verified & captured successfully!')
+        })
+        .catch((err) => {
+          console.error('Auto-capture notification:', err)
+        })
+        .finally(() => {
+          setCapturing(false)
+        })
+    }
+  }, [transactionId])
 
   return (
     <div className="max-w-2xl mx-auto py-12 px-4 text-center space-y-6">
       <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/20">
-        <CheckCircle2 className="w-10 h-10" />
+        {capturing ? <Loader2 className="w-10 h-10 animate-spin" /> : <CheckCircle2 className="w-10 h-10" />}
       </div>
 
       <div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight">
-          Escrow Funding Confirmed!
+          {capturing ? 'Verifying Escrow Capture...' : 'Escrow Funding Confirmed!'}
         </h1>
         <p className="text-sm text-slate-400 mt-2">
-          Your PayPal Sandbox transaction was successfully authorized and the milestone funds are locked safely in escrow.
+          {capturing
+            ? 'Finalizing PayPal settlement and securing milestone release funds...'
+            : 'Your PayPal Sandbox transaction was successfully authorized and the milestone funds are locked safely in escrow.'}
         </p>
       </div>
 

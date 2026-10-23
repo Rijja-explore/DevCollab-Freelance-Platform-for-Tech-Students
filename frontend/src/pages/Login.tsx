@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Sparkles, ArrowRight, Lock, Mail, ShieldCheck, Zap, Users } from 'lucide-react'
+import { Sparkles, ArrowRight, Lock, Mail, Zap, Users } from 'lucide-react'
 import { useAuth, UserRole } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
@@ -79,7 +79,7 @@ export const Login: React.FC = () => {
             <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
               1-Click Demo Profiles (Instant Access)
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => handleQuickDemo('STUDENT')}
@@ -95,14 +95,6 @@ export const Login: React.FC = () => {
               >
                 <Zap className="w-4 h-4" />
                 <span>Startup</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDemo('ADMIN')}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 hover:bg-indigo-500/20 transition-all text-xs font-semibold gap-1.5"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Admin</span>
               </button>
             </div>
           </div>
@@ -170,6 +162,17 @@ export const Login: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
+
+          <div className="pt-4 border-t border-white/10 text-center space-y-2.5">
+            <p className="text-xs text-slate-400">Need a brand new custom account?</p>
+            <Link
+              to="/register"
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white font-semibold text-xs transition-all shadow-sm"
+            >
+              <Users className="w-4 h-4 text-brand-400" />
+              <span>Create New Account (Student or Startup)</span>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

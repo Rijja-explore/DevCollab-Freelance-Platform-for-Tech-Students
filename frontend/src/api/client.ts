@@ -76,8 +76,14 @@ export const discoveryApi = {
     if (skills && skills.length) skills.forEach((s) => params.append('skills', s))
     return client.get(`/api/profiles/students/search?${params}`)
   },
+  apply: (projectId: string, studentId: string) =>
+    client.post('/api/matches/apply', { projectId, studentId }),
   match: (projectId: string, studentId: string) =>
     client.post('/api/matches', { projectId, studentId }),
+  approveMatch: (matchId: string, startupId?: string) =>
+    client.post(`/api/matches/${matchId}/approve`, { startupId }),
+  rejectMatch: (matchId: string, startupId?: string) =>
+    client.post(`/api/matches/${matchId}/reject`, { startupId }),
   getAllMatches: () =>
     client.get('/api/matches'),
   getStudentMatches: (studentId: string) =>
@@ -111,7 +117,9 @@ export const discoveryApi = {
             difficulty
             url
             reason
-            score
+            resourceType
+            viewCount
+            itemCount
           }
         }
       }`,
@@ -121,8 +129,19 @@ export const discoveryApi = {
 
 // ─── Collaboration Workspace Service API ───────────────────────────────────────
 export const workspaceApi = {
-  getAll: () =>
-    client.get('/api/workspaces'),
+  getAll: (profileId?: string) => {
+    let pId = profileId
+    if (!pId) {
+      try {
+        const u = JSON.parse(localStorage.getItem('devcollab_user') || '{}')
+        pId = u?.profileId
+      } catch {
+        // ignore
+      }
+    }
+    const params = pId ? `?profileId=${encodeURIComponent(pId)}` : ''
+    return client.get(`/api/workspaces${params}`)
+  },
   getById: (id: string) =>
     client.get(`/api/workspaces/${id}`),
   getMessages: (workspaceId: string, limit = 50) =>
@@ -133,6 +152,68 @@ export const workspaceApi = {
     client.get(`/api/comments/${workspaceId}`),
   addComment: (workspaceId: string, content: string, lineNumber?: number, fileSnippet?: string) =>
     client.post(`/api/comments/${workspaceId}`, { content, lineNumber, fileSnippet }),
+  replyToComment: (commentId: string, text: string) =>
+    client.post(`/api/comments/${commentId}/reply`, { text }),
+
+  // ── GitHub Code Review ─────────────────────────────────────────────────────
+  // All calls go through the backend — GITHUB_TOKEN is never exposed to the browser.
+  github: {
+    /** Get linked repo info, or { linked: false } if none is set. */
+    getRepo: (workspaceId: string) =>
+      client.get(`/api/workspaces/${workspaceId}/github/repo`),
+
+    /** Link (or re-link) a GitHub repository to this workspace. */
+    linkRepo: (workspaceId: string, githubOwner: string, githubRepo: string) =>
+      client.put(`/api/workspaces/${workspaceId}/github/repo`, { githubOwner, githubRepo }),
+
+    /** List files/folders at `path` (defaults to repo root). */
+    listFiles: (workspaceId: string, path = '', ref?: string) => {
+      const params = new URLSearchParams()
+      if (path) params.append('path', path)
+      if (ref)  params.append('ref', ref)
+      const qs = params.toString()
+      return client.get(`/api/workspaces/${workspaceId}/github/files${qs ? `?${qs}` : ''}`)
+    },
+
+    /** Fetch decoded content of a single file. */
+    getFile: (workspaceId: string, filePath: string, ref?: string) => {
+      const params = new URLSearchParams({ path: filePath })
+      if (ref) params.append('ref', ref)
+      return client.get(`/api/workspaces/${workspaceId}/github/file?${params}`)
+    },
+
+    /** Create a new file in the linked repository. */
+    createFile: (
+      workspaceId: string,
+      path: string,
+      content: string,
+      message?: string,
+      branch?: string,
+    ) =>
+      client.post(`/api/workspaces/${workspaceId}/github/file`, {
+        path,
+        content,
+        message,
+        branch,
+      }),
+
+    /** Update an existing file (sha of current blob required). */
+    updateFile: (
+      workspaceId: string,
+      path: string,
+      content: string,
+      sha: string,
+      message?: string,
+      branch?: string,
+    ) =>
+      client.put(`/api/workspaces/${workspaceId}/github/file`, {
+        path,
+        content,
+        sha,
+        message,
+        branch,
+      }),
+  },
 }
 
 // ─── Escrow & Milestone Service API ───────────────────────────────────────────
@@ -162,6 +243,8 @@ export const milestonesApi = {
     client.post(`/api/milestones/${id}/approve`),
   release: (id: string) =>
     client.post(`/api/milestones/${id}/release`),
+  complete: (id: string) =>
+    client.post(`/api/milestones/${id}/complete`),
 }
 
 export const transactionsApi = {

@@ -50,7 +50,40 @@ public class MatchController {
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> matchProject(@RequestBody MatchRequestDto request) {
-        MatchingService.MatchResult result = matchingService.matchProject(request.getProjectId(), request.getStudentId());
+        MatchingService.MatchResult result = matchingService.applyForProject(request.getProjectId(), request.getStudentId());
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("data", result);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/apply")
+    public ResponseEntity<Map<String, Object>> applyProject(@RequestBody MatchRequestDto request) {
+        MatchingService.MatchResult result = matchingService.applyForProject(request.getProjectId(), request.getStudentId());
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("data", result);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{matchId}/approve")
+    public ResponseEntity<Map<String, Object>> approveMatch(
+            @PathVariable String matchId,
+            @RequestBody(required = false) Map<String, String> body) {
+        String startupId = (body != null && body.containsKey("startupId")) ? body.get("startupId") : "startup-owner";
+        MatchingService.MatchResult result = matchingService.approveMatch(matchId, startupId);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("data", result);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{matchId}/reject")
+    public ResponseEntity<Map<String, Object>> rejectMatch(
+            @PathVariable String matchId,
+            @RequestBody(required = false) Map<String, String> body) {
+        String startupId = (body != null && body.containsKey("startupId")) ? body.get("startupId") : "startup-owner";
+        MatchingService.MatchResult result = matchingService.rejectMatch(matchId, startupId);
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("data", result);

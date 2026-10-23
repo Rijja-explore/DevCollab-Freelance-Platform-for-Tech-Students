@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -6,22 +6,20 @@ import {
   Handshake,
   FolderGit2,
   FileText,
-  DollarSign,
   CreditCard,
   Bell,
   User,
-  Settings,
   Briefcase,
   Users,
   Milestone,
-  ShieldCheck,
-  Code2,
   Sparkles,
   LogOut,
+  UserPlus,
   X,
   LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { workspaceApi } from '../api/client'
 
 interface SidebarProps {
   isOpen: boolean
@@ -44,95 +42,122 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const { role, logout, user } = useAuth()
+  const [hasCollaboration, setHasCollaboration] = useState(false)
 
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
 
-  // Define role-specific navigation lists strictly matching the user architecture
+  const normalizedRole = ((role || user?.role || 'STUDENT') as string).toUpperCase()
+
+  // Check if current user is participant in any active collaboration
+  useEffect(() => {
+    let isMounted = true
+    workspaceApi.getAll()
+      .then((res) => {
+        if (!isMounted) return
+        const data = res.data?.data ?? res.data ?? []
+        if (Array.isArray(data)) {
+          const isParticipant = data.some((ws: any) =>
+            ws.studentId === user?.id ||
+            ws.studentId === user?.profileId ||
+            ws.startupId === user?.id ||
+            ws.startupId === user?.profileId
+          )
+          setHasCollaboration(isParticipant)
+        }
+      })
+      .catch(() => {
+        // fallback
+      })
+    return () => { isMounted = false }
+  }, [user?.id, user?.profileId])
+
+  // Define role-specific navigation lists strictly matching user permissions
   const getNavSections = (): NavSection[] => {
-    if (role === 'STUDENT') {
+    if (normalizedRole === 'STUDENT') {
+      const studentItems: NavItem[] = [
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview & metrics' },
+        { to: '/projects', label: 'Discover Projects', icon: Search, desc: 'Search & matching' },
+        { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Skill-matched gigs & gaps' },
+        { to: '/applications', label: 'My Applications', icon: Handshake, desc: 'Applied gigs & status' },
+      ]
+
+      // My Collaborations is visible ONLY to the particular student once accepted
+      if (hasCollaboration) {
+        studentItems.push({
+          to: '/workspaces',
+          label: 'My Collaborations',
+          icon: FolderGit2,
+          desc: 'Live chat & code review',
+        })
+      }
+
+      studentItems.push({ to: '/contracts', label: 'My Contracts', icon: FileText, desc: 'Escrow agreements' })
+
       return [
         {
           title: 'Student Navigation',
-          items: [
-            { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview & metrics' },
-            { to: '/projects', label: 'Discover Projects', icon: Search, desc: 'Search & matching' },
-            { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Skill-matched gigs' },
-            { to: '/applications', label: 'My Applications', icon: Handshake, desc: 'Applied gigs & status' },
-            { to: '/workspaces', label: 'My Collaborations', icon: FolderGit2, desc: 'Live chat & code review' },
-            { to: '/contracts', label: 'My Contracts', icon: FileText, desc: 'Escrow agreements' },
-            { to: '/transactions', label: 'Payments', icon: DollarSign, desc: 'Earnings & payouts' },
-          ],
+          items: studentItems,
         },
         {
           title: 'Account',
           items: [
             { to: '/notifications', label: 'Notifications', icon: Bell, desc: 'System updates' },
-            { to: '/profile', label: 'Profile', icon: User, desc: 'Developer skills & rate' },
-            { to: '/settings', label: 'Settings', icon: Settings, desc: 'Preferences & security' },
+            { to: '/profile', label: 'Developer Profile', icon: User, desc: 'Skills, qualifications & portfolio' },
           ],
         },
       ]
     }
 
-    if (role === 'STARTUP') {
+    if (normalizedRole === 'STARTUP') {
+      const startupItems: NavItem[] = [
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Hires & budget overview' },
+        { to: '/projects', label: 'My Projects', icon: Briefcase, desc: 'Post & manage gigs' },
+        { to: '/talent', label: 'Find Talent', icon: Search, desc: 'Student developers' },
+        { to: '/applicants', label: 'Applicants', icon: Users, desc: 'Review & match talent' },
+      ]
+
+      // Collaborations visible only when startup has an active collaboration
+      if (hasCollaboration) {
+        startupItems.push({
+          to: '/workspaces',
+          label: 'Collaborations',
+          icon: FolderGit2,
+          desc: 'Workspaces & code reviews',
+        })
+      }
+
+      startupItems.push(
+        { to: '/contracts', label: 'Contracts', icon: FileText, desc: 'Escrow agreements' },
+        { to: '/milestones', label: 'Milestones & Escrow', icon: Milestone, desc: 'PayPal checkout & release' },
+        { to: '/transactions', label: 'Payment Ledger', icon: CreditCard, desc: 'Escrow deposit records' },
+      )
+
       return [
         {
           title: 'Startup Navigation',
-          items: [
-            { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Hires & budget overview' },
-            { to: '/projects', label: 'My Projects', icon: Briefcase, desc: 'Post & manage gigs' },
-            { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Skill-matched talent' },
-            { to: '/talent', label: 'Find Talent', icon: Search, desc: 'Student developers' },
-            { to: '/applicants', label: 'Applicants', icon: Users, desc: 'Review & match talent' },
-            { to: '/workspaces', label: 'Collaborations', icon: FolderGit2, desc: 'Workspaces & code reviews' },
-            { to: '/contracts', label: 'Contracts', icon: FileText, desc: 'Escrow agreements' },
-            { to: '/milestones', label: 'Milestones', icon: Milestone, desc: 'PayPal checkout & release' },
-            { to: '/transactions', label: 'Payments', icon: CreditCard, desc: 'Escrow deposit ledger' },
-          ],
+          items: startupItems,
         },
         {
           title: 'Account',
           items: [
             { to: '/notifications', label: 'Notifications', icon: Bell, desc: 'System updates' },
             { to: '/profile', label: 'Company Profile', icon: User, desc: 'Startup info & projects' },
-            { to: '/settings', label: 'Settings', icon: Settings, desc: 'Preferences & security' },
           ],
         },
       ]
     }
 
-    // Default ADMIN Navigation
+    // Default student view
     return [
       {
-        title: 'Platform Overview',
+        title: 'Student Navigation',
         items: [
-          { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'System telemetry' },
-          { to: '/projects', label: 'Projects Catalog', icon: Search, desc: 'All projects' },
-          { to: '/recommendations', label: 'AI Match Engine', icon: Sparkles, desc: 'Matching algorithm' },
-          { to: '/talent', label: 'Find Talent', icon: Search, desc: 'All students' },
-          { to: '/applicants', label: 'Applicants', icon: Users, desc: 'All applications' },
-          { to: '/workspaces', label: 'Workspaces', icon: FolderGit2, desc: 'Active rooms' },
-        ],
-      },
-      {
-        title: 'Fintech & Security',
-        items: [
-          { to: '/contracts', label: 'Contracts', icon: FileText, desc: 'All contracts' },
-          { to: '/milestones', label: 'Milestones', icon: Milestone, desc: 'Milestone tracker' },
-          { to: '/transactions', label: 'Transactions', icon: CreditCard, desc: 'Ledger records' },
-          { to: '/audit-logs', label: 'Security Audit', icon: ShieldCheck, desc: 'Traceability trail' },
-          { to: '/graphql-explorer', label: 'GraphQL API', icon: Code2, desc: 'Schema explorer' },
-        ],
-      },
-      {
-        title: 'Account',
-        items: [
-          { to: '/notifications', label: 'Notifications', icon: Bell, desc: 'Event activity' },
-          { to: '/profile', label: 'Profile', icon: User, desc: 'Admin account' },
-          { to: '/settings', label: 'System Settings', icon: Settings, desc: 'RS256 & topology' },
+          { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview & metrics' },
+          { to: '/projects', label: 'Discover Projects', icon: Search, desc: 'Search & matching' },
+          { to: '/applications', label: 'My Applications', icon: Handshake, desc: 'Applied gigs' },
         ],
       },
     ]
@@ -160,7 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           <div>
             <h1 className="font-bold text-white text-lg tracking-tight">DevCollab</h1>
             <span className="text-[10px] text-brand-400 font-semibold tracking-widest uppercase">
-              {role === 'STUDENT' ? 'Student Portal' : role === 'STARTUP' ? 'Startup Portal' : 'Admin Console'}
+              {normalizedRole === 'STUDENT' ? 'Student Portal' : normalizedRole === 'STARTUP' ? 'Startup Portal' : 'Admin Console'}
             </span>
           </div>
         </NavLink>
@@ -239,19 +264,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 {user?.name || 'DevCollab Member'}
               </div>
               <div className="text-[10px] text-slate-400 truncate">
-                {role}
+                {normalizedRole}
               </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
-            title="Sign Out"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <NavLink
+              to="/register"
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+              title="Create New Account"
+            >
+              <UserPlus className="w-4 h-4" />
+            </NavLink>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </aside>

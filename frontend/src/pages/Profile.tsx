@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import {
   User,
-  DollarSign,
   Star,
   Sparkles,
   Save,
@@ -22,7 +21,6 @@ export const Profile: React.FC = () => {
   const [bio, setBio] = useState(
     user?.bio || 'DevCollab community member.',
   )
-  const [hourlyRate, setHourlyRate] = useState<number>(user?.hourlyRate || 35)
   const [skills, setSkills] = useState<string[]>(
     user?.skills || (role === 'STUDENT' ? ['React', 'TypeScript', 'Node.js'] : []),
   )
@@ -48,7 +46,6 @@ export const Profile: React.FC = () => {
         name,
         headline,
         bio,
-        hourlyRate: role === 'STUDENT' ? hourlyRate : undefined,
         skills,
       })
       setSaving(false)
@@ -90,11 +87,6 @@ export const Profile: React.FC = () => {
               <span className="flex items-center gap-1 text-amber-400">
                 <Star className="w-3.5 h-3.5 fill-amber-400" /> {user?.rating || 4.9} Rating
               </span>
-              {role === 'STUDENT' && (
-                <span className="flex items-center gap-1 text-emerald-400">
-                  <DollarSign className="w-3.5 h-3.5" /> ${hourlyRate}/hr
-                </span>
-              )}
               <span className="flex items-center gap-1 text-sky-400">
                 <ShieldCheck className="w-3.5 h-3.5" /> Verified ID
               </span>
@@ -154,22 +146,6 @@ export const Profile: React.FC = () => {
               className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500 transition-all"
             />
           </div>
-
-          {role === 'STUDENT' && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Hourly Rate ($ USD)
-              </label>
-              <input
-                type="number"
-                value={hourlyRate}
-                onChange={(e) => setHourlyRate(Number(e.target.value))}
-                min="15"
-                max="250"
-                className="w-full sm:w-48 px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500 transition-all"
-              />
-            </div>
-          )}
 
           {/* Skill Matrix */}
           <div>

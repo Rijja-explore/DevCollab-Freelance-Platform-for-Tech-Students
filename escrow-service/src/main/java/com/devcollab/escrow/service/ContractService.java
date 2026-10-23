@@ -73,7 +73,7 @@ public class ContractService {
                 .title(title)
                 .description(request.getDescription())
                 .totalAmount(totalAmount)
-                .currency(request.getCurrency() != null ? request.getCurrency() : "INR")
+                .currency(request.getCurrency() != null ? request.getCurrency() : "USD")
                 .terms(request.getTerms())
                 .status(ContractStatus.ACTIVE)
                 .milestones(new ArrayList<>())
@@ -195,7 +195,7 @@ public class ContractService {
                 .title(title)
                 .description(description)
                 .totalAmount(totalBudget)
-                .currency(currency != null ? currency : "INR")
+                .currency(currency != null ? currency : "USD")
                 .status(ContractStatus.ACTIVE)
                 .milestones(new ArrayList<>())
                 .build();

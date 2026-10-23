@@ -38,6 +38,9 @@ public class ProjectService {
         if (status != null && !status.isBlank()) {
             try {
                 ProjectStatus st = ProjectStatus.valueOf(status.toUpperCase());
+                if (category != null && !category.isBlank()) {
+                    return projectRepository.findByCategoryIgnoreCaseAndStatus(category, st, pageRequest).getContent();
+                }
                 return projectRepository.findByStatus(st, pageRequest).getContent();
             } catch (Exception ignored) {}
         }
@@ -151,7 +154,9 @@ public class ProjectService {
                 
                 if (!docs.isEmpty()) {
                     List<String> ids = docs.stream().map(ProjectDocument::getId).collect(Collectors.toList());
-                    return projectRepository.findAllById(ids);
+                    return projectRepository.findAllById(ids).stream()
+                            .filter(p -> p.getStatus() == ProjectStatus.OPEN)
+                            .collect(Collectors.toList());
                 }
             }
             
@@ -162,7 +167,9 @@ public class ProjectService {
                 List<ProjectDocument> skillDocs = elasticsearchRepository.findBySkillsIn(lowerSkills);
                 if (!skillDocs.isEmpty()) {
                     List<String> ids = skillDocs.stream().map(ProjectDocument::getId).collect(Collectors.toList());
-                    return projectRepository.findAllById(ids);
+                    return projectRepository.findAllById(ids).stream()
+                            .filter(p -> p.getStatus() == ProjectStatus.OPEN)
+                            .collect(Collectors.toList());
                 }
             }
             
@@ -170,12 +177,15 @@ public class ProjectService {
                 List<ProjectDocument> categoryDocs = elasticsearchRepository.findByCategoryIgnoreCase(category);
                 if (!categoryDocs.isEmpty()) {
                     List<String> ids = categoryDocs.stream().map(ProjectDocument::getId).collect(Collectors.toList());
-                    return projectRepository.findAllById(ids);
+                    return projectRepository.findAllById(ids).stream()
+                            .filter(p -> p.getStatus() == ProjectStatus.OPEN)
+                            .collect(Collectors.toList());
                 }
             }
             
+            // If no filters provided or no results from Elasticsearch, return all open
             if (keyword == null && (skills == null || skills.isEmpty()) && category == null) {
-                return projectRepository.findAll();
+                return projectRepository.findByStatus(ProjectStatus.OPEN);
             }
             
         } catch (Exception e) {
@@ -223,10 +233,11 @@ public class ProjectService {
             }
         }
         
+        // Remove duplicates and filter to OPEN
         Set<String> seenIds = new HashSet<>();
         List<Project> uniqueResults = new ArrayList<>();
         for (Project project : results) {
-            if (seenIds.add(project.getId())) {
+            if (project.getStatus() == ProjectStatus.OPEN && seenIds.add(project.getId())) {
                 uniqueResults.add(project);
             }
         }
@@ -260,12 +271,9 @@ public class ProjectService {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Project not found: " + id));
 
-        if (title != null && !title.isBlank()) project.setTitle(title);
-        if (description != null) project.setDescription(description);
-        if (category != null && !category.isBlank()) project.setCategory(category);
-        if (budget != null) project.setBudget(budget);
-        if (currency != null && !currency.isBlank()) project.setCurrency(currency);
-        if (requiredSkills != null) project.setRequiredSkills(requiredSkills);
+        if (title != null || description != null || category != null || budget != null || currency != null || requiredSkills != null) {
+            throw new IllegalStateException("Projects cannot be edited once created.");
+        }
         if (status != null && !status.isBlank()) {
             try {
                 project.setStatus(ProjectStatus.valueOf(status.toUpperCase()));

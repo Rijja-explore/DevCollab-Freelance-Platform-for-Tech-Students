@@ -4,6 +4,9 @@ import {
   Sparkles,
   MessageSquare,
   FileText,
+  Check,
+  X,
+  Lock,
 } from 'lucide-react'
 import { discoveryApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
@@ -116,6 +119,30 @@ names[app.studentId] =
     fetchApplicants()
   }, [startupId])
 
+  const handleApprove = async (matchId: string) => {
+    try {
+      const res = await discoveryApi.approveMatch(matchId, startupId)
+      toast.success(res.data?.data?.message || 'Application approved! Workspace and Escrow initialized.')
+      setApplicants((prev) =>
+        prev.map((app) => (app.id === matchId ? { ...app, status: 'ACCEPTED' } : app))
+      )
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to approve application')
+    }
+  }
+
+  const handleReject = async (matchId: string) => {
+    try {
+      const res = await discoveryApi.rejectMatch(matchId, startupId)
+      toast.success(res.data?.data?.message || 'Application declined.')
+      setApplicants((prev) =>
+        prev.map((app) => (app.id === matchId ? { ...app, status: 'REJECTED' } : app))
+      )
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to reject application')
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Service 1 Discovery Banner */}
@@ -148,8 +175,20 @@ names[app.studentId] =
                     {Number(app.matchScore).toFixed(0)}% Fit Score
                   </span>
 
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                    {app.status || 'MATCHED'}
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                      app.status === 'ACCEPTED' || app.status === 'MATCHED'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : app.status === 'REJECTED'
+                        ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                    }`}
+                  >
+                    {app.status === 'ACCEPTED' || app.status === 'MATCHED'
+                      ? 'APPROVED'
+                      : app.status === 'REJECTED'
+                      ? 'DECLINED'
+                      : 'PENDING APPROVAL'}
                   </span>
                 </div>
 
@@ -199,23 +238,62 @@ names[app.studentId] =
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-3 border-t border-white/10">
-                <Link
-                  to={`/workspaces/${app.projectId}`}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-white transition-colors border border-white/10"
-                >
-                  <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-                  Chat in Workspace
-                </Link>
+              {/* Status-Gated Actions */}
+              {app.status === 'ACCEPTED' || app.status === 'MATCHED' ? (
+                <div className="flex items-center gap-2 pt-3 border-t border-white/10">
+                  <Link
+                    to={`/workspaces/${app.projectId}`}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition-all shadow-md shadow-emerald-600/20"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Chat with Approved Candidate
+                  </Link>
 
-                <Link
-                  to="/contracts"
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition-all shadow-md shadow-indigo-600/20"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  Create Contract
-                </Link>
-              </div>
+                  <Link
+                    to="/contracts"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-semibold text-white transition-all border border-white/10"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Contract
+                  </Link>
+                </div>
+              ) : app.status === 'REJECTED' ? (
+                <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-500">
+                  <span>Application declined</span>
+                  <button
+                    type="button"
+                    onClick={() => handleApprove(app.id)}
+                    className="text-indigo-400 hover:underline text-[11px] font-semibold"
+                  >
+                    Re-approve
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2 pt-3 border-t border-white/10">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleApprove(app.id)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition-all shadow-md shadow-emerald-600/20"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      Approve Candidate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReject(app.id)}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold transition-all"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Decline
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                    <Lock className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                    <span>Direct messaging locked. Approving activates workspace & escrow.</span>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

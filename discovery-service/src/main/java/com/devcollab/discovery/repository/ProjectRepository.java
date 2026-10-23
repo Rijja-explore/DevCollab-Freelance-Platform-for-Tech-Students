@@ -18,8 +18,10 @@ public interface ProjectRepository extends JpaRepository<Project, String>, JpaSp
     List<Project> findByStatus(ProjectStatus status);
 
     List<Project> findByCategoryIgnoreCase(String category);
+    List<Project> findByCategoryIgnoreCaseAndStatus(String category, ProjectStatus status);
 
     Page<Project> findByStatus(ProjectStatus status, Pageable pageable);
+    Page<Project> findByCategoryIgnoreCaseAndStatus(String category, ProjectStatus status, Pageable pageable);
 
     @Query("SELECT p FROM Project p WHERE LOWER(p.title) LIKE LOWER(CONCAT('%', :kw, '%')) OR LOWER(p.description) LIKE LOWER(CONCAT('%', :kw, '%'))")
     List<Project> searchByKeyword(@Param("kw") String keyword);

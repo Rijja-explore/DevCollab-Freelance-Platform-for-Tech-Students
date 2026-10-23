@@ -10,3 +10,7 @@
 .DS_Store
 .idea/
 .vscode/
+
+# Local private keys — never commit
+keys/private.pem
+Payment Escrow & Milestone System/escrow-service/src/main/resources/keys/local-dev-private.pem

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Sparkles, ArrowRight, User, Mail, Lock, Briefcase, GraduationCap, DollarSign, Plus, X } from 'lucide-react'
+import { Sparkles, ArrowRight, User, Mail, Lock, Briefcase, GraduationCap, Plus, X } from 'lucide-react'
 import { useAuth, UserRole } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
@@ -11,7 +11,6 @@ export const Register: React.FC = () => {
   const [password, setPassword] = useState('')
   const [headline, setHeadline] = useState('')
   const [bio, setBio] = useState('')
-  const [hourlyRate, setHourlyRate] = useState<number>(35)
   const [skills, setSkills] = useState<string[]>(['React', 'TypeScript', 'Node.js', 'PostgreSQL'])
   const [newSkill, setNewSkill] = useState('')
   const [loading, setLoading] = useState(false)
@@ -46,7 +45,6 @@ export const Register: React.FC = () => {
         name,
         headline: headline || (role === 'STUDENT' ? 'Student Software Developer' : 'Founder & Project Owner'),
         bio: bio || 'Passionate developer building high-quality software on DevCollab.',
-        hourlyRate: role === 'STUDENT' ? hourlyRate : undefined,
         skills: role === 'STUDENT' ? skills : undefined,
       })
       navigate('/dashboard')
@@ -214,25 +212,6 @@ export const Register: React.FC = () => {
 
             {role === 'STUDENT' && (
               <>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                    Hourly Rate (USD)
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <DollarSign className="w-4 h-4" />
-                    </div>
-                    <input
-                      type="number"
-                      value={hourlyRate}
-                      onChange={(e) => setHourlyRate(Number(e.target.value))}
-                      min="15"
-                      max="200"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-500 transition-all"
-                    />
-                  </div>
-                </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                     Technical Skills & Frameworks

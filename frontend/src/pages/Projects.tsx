@@ -9,7 +9,6 @@ import {
   DollarSign,
   ArrowRight,
   X,
-  Edit3,
   Trash2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -39,7 +38,6 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
   const [selectedSkills, setSelectedSkills] = useState<string[]>([])
   const [skillInput, setSkillInput] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(defaultOpenModal)
-  const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [projectsList, setProjectsList] = useState<Project[]>([])
 
@@ -66,15 +64,23 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
   const loadProjects = useCallback(async () => {
     setLoading(true)
     try {
+      const isStudent = role === 'STUDENT'
       if (searchQuery.trim() || selectedSkills.length > 0) {
-        const res = await discoveryApi.search(searchQuery.trim() || undefined, selectedSkills.length > 0 ? selectedSkills : undefined, category === 'ALL' ? undefined : category)
+        const res = await discoveryApi.search(
+          searchQuery.trim() || undefined,
+          selectedSkills.length > 0 ? selectedSkills : undefined,
+          category === 'ALL' ? undefined : category
+        )
         const data = res.data?.data ?? res.data ?? []
-        setProjectsList(Array.isArray(data) ? data : [])
+        const list = Array.isArray(data) ? data : []
+        setProjectsList(isStudent ? list.filter((p: any) => p.status === 'OPEN') : list)
       } else {
         const cat = category === 'ALL' ? undefined : category
-        const res = await discoveryApi.getProjects(cat, undefined)
+        const statusParam = isStudent ? 'OPEN' : undefined
+        const res = await discoveryApi.getProjects(cat, statusParam)
         const data = res.data?.data ?? res.data ?? []
-        setProjectsList(Array.isArray(data) ? data : [])
+        const list = Array.isArray(data) ? data : []
+        setProjectsList(isStudent ? list.filter((p: any) => p.status === 'OPEN') : list)
       }
     } catch (err) {
       console.error('Error loading projects:', err)
@@ -82,7 +88,7 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
     } finally {
       setLoading(false)
     }
-  }, [category, searchQuery, selectedSkills])
+  }, [category, searchQuery, selectedSkills, role])
 
   useEffect(() => {
     loadProjects()
@@ -119,31 +125,17 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
         .map((s) => s.trim())
         .filter(Boolean)
 
-      if (editingProject) {
-        // Update existing project
-        await discoveryApi.updateProject(editingProject.id, {
-          title,
-          description,
-          category: formCategory,
-          budget: parseFloat(budget),
-          currency: 'USD',
-          requiredSkills: skills.length > 0 ? skills : ['React', 'TypeScript'],
-        })
-        toast.success('Project updated successfully!')
-        setEditingProject(null)
-      } else {
-        // Create new project
-        await discoveryApi.createProject({
-          startupId: user?.id || 'startup-owner-1',
-          title,
-          description,
-          category: formCategory,
-          budget: parseFloat(budget),
-          currency: 'USD',
-          requiredSkills: skills.length > 0 ? skills : ['React', 'TypeScript'],
-        })
-        toast.success('Project created and indexed in Elasticsearch!')
-      }
+      // Create new project (cannot be edited once created)
+      await discoveryApi.createProject({
+        startupId: user?.id || 'startup-owner-1',
+        title,
+        description,
+        category: formCategory,
+        budget: parseFloat(budget),
+        currency: 'USD',
+        requiredSkills: skills.length > 0 ? skills : ['React', 'TypeScript'],
+      })
+      toast.success('Project created and indexed in Elasticsearch!')
 
       setShowCreateModal(false)
       setTitle('')
@@ -161,18 +153,7 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
     }
   }
 
-  const handleEditProject = (project: Project) => {
-    setEditingProject(project)
-    setTitle(project.title)
-    setDescription(project.description)
-    setFormCategory(project.category)
-    setBudget(project.budget.toString())
-    setSkillsInput(project.requiredSkills?.join(', ') || '')
-    setShowCreateModal(true)
-  }
-
-  const handleCancelEdit = () => {
-    setEditingProject(null)
+  const handleCloseModal = () => {
     setShowCreateModal(false)
     setTitle('')
     setDescription('')
@@ -374,17 +355,9 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* Edit/Delete buttons for project owner (startup) */}
+                  {/* Delete button for project owner (editing disallowed once created) */}
                   {(role === 'STARTUP' || role === 'ADMIN') && project.startupId === user?.id && (
                     <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleEditProject(project)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-400 hover:bg-blue-500/10 border border-blue-500/20 transition-all"
-                        title="Edit this project"
-                      >
-                        <Edit3 className="w-3 h-3" /> Edit
-                      </button>
                       <button
                         type="button"
                         onClick={async () => {
@@ -420,17 +393,18 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
         </div>
       )}
 
-      {/* Post/Edit Project Modal */}
+      {/* Post Project Modal (Projects cannot be edited once created) */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="max-w-lg w-full p-6 rounded-3xl bg-slate-900 border border-white/10 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-base font-bold text-white">
-                {editingProject ? 'Edit Project' : 'Post New Project'}
-              </h3>
+              <div>
+                <h3 className="text-base font-bold text-white">Post New Project</h3>
+                <p className="text-[11px] text-slate-400">Note: Projects cannot be edited once published.</p>
+              </div>
               <button
                 type="button"
-                onClick={handleCancelEdit}
+                onClick={handleCloseModal}
                 className="text-slate-400 hover:text-white"
               >
                 <X className="w-5 h-5" />
@@ -503,7 +477,7 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
               <div className="pt-3 border-t border-white/10 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={handleCancelEdit}
+                  onClick={handleCloseModal}
                   className="px-4 py-2 rounded-xl bg-white/5 text-slate-400 text-xs font-semibold hover:bg-white/10"
                 >
                   Cancel
@@ -513,7 +487,7 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
                   disabled={submitting}
                   className="px-5 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold hover:bg-brand-600 disabled:opacity-50"
                 >
-                  {submitting ? (editingProject ? 'Updating...' : 'Publishing...') : (editingProject ? 'Update Project' : 'Publish Project')}
+                  {submitting ? 'Publishing...' : 'Publish Project'}
                 </button>
               </div>
             </form>

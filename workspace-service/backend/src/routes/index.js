@@ -3,6 +3,7 @@ import workspacesRouter from './workspaces.js';
 import messagesRouter from './messages.js';
 import commentsRouter from './comments.js';
 import milestonesRouter from './milestones.js';
+import githubRouter from './github.js';
 
 const router = express.Router();
 
@@ -13,5 +14,8 @@ router.use('/workspaces', workspacesRouter);
 router.use('/', messagesRouter);
 router.use('/', commentsRouter);
 router.use('/', milestonesRouter);
+
+// GitHub Code Review routes — /api/workspaces/:workspaceId/github/*
+router.use('/', githubRouter);
 
 export default router;

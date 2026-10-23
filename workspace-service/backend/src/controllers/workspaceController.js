@@ -71,13 +71,17 @@ export const getWorkspaceByProjectId = async (req, res, next) => {
 export const getAllWorkspaces = async (req, res, next) => {
   try {
     const filter = {};
-    const userId = req.user?.id;
+    const userId = req.user?.id || req.query.userId;
+    const profileId = req.query.profileId;
     
     if (req.user && req.user.role !== 'admin' && req.user.role !== 'ADMIN') {
       filter.userId = userId;
-      logger.info(`[workspaceController] Fetching workspaces for user: ${userId} (role: ${req.user.role})`);
+      if (profileId) filter.profileId = profileId;
+      logger.info(`[workspaceController] Fetching workspaces for user: ${userId}, profileId: ${profileId}`);
     } else {
-      logger.info(`[workspaceController] Fetching all workspaces (admin user: ${userId})`);
+      if (req.query.userId) filter.userId = req.query.userId;
+      if (profileId) filter.profileId = profileId;
+      logger.info(`[workspaceController] Fetching workspaces (admin or unauthenticated with query params: ${JSON.stringify(filter)})`);
     }
     
     const result = await workspaceService.getAllWorkspaces(filter);

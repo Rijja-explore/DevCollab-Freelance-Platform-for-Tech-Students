@@ -124,7 +124,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onCapture
 import { useAuth } from '../contexts/AuthContext';
 
 export const Milestones: React.FC = () => {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const [searchParams] = useSearchParams();
   const contractIdParam = searchParams.get('contractId');
 
@@ -282,10 +282,20 @@ export const Milestones: React.FC = () => {
   const milestonesList = milestonesData?.content ?? milestonesData?.data?.content ?? (Array.isArray(milestonesData) ? milestonesData : []);
   const totalPages = milestonesData?.totalPages ?? milestonesData?.data?.totalPages ?? 1;
 
-  // Filter milestones if contractId parameter is present
-  const filteredMilestones = contractIdParam
-    ? milestonesList.filter((m: any) => m.contractId === contractIdParam)
-    : milestonesList;
+  // Filter milestones so they are visible only to the particular student and startup owner
+  const filteredMilestones = milestonesList.filter((m: any) => {
+    if (contractIdParam && m.contractId !== contractIdParam) return false;
+    if (m.contract) {
+      const isParticipant =
+        !user?.id ||
+        m.contract.studentId === user?.id ||
+        m.contract.studentId === user?.profileId ||
+        m.contract.startupId === user?.id ||
+        m.contract.startupId === user?.profileId;
+      if (!isParticipant) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -436,14 +446,17 @@ export const Milestones: React.FC = () => {
                                 onClick={async () => {
                                   try {
                                     console.log('[Approve & Fund] Starting...')
-                                    await handleApprove(milestone.id);
-                                    console.log('[Approve & Fund] Milestone approved, now calling handlePay...')
-                                    // Wait a small moment for the approve to fully complete
-                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                    try {
+                                      await handleApprove(milestone.id);
+                                    } catch (approveErr: any) {
+                                      console.warn('[Approve & Fund] Approval step notice:', approveErr);
+                                    }
+                                    // Wait a small moment then launch PayPal payment flow
+                                    await new Promise(resolve => setTimeout(resolve, 300));
                                     await handlePay(milestone.id, milestone.amount, milestone.title);
                                   } catch (err) {
-                                    console.error('[Approve & Fund] Error during approve flow:', err);
-                                    toast.error('Failed to approve milestone. Please try again.');
+                                    console.error('[Approve & Fund] Error during payment flow:', err);
+                                    toast.error('Failed to trigger payment flow. Please try again.');
                                   }
                                 }}
                                 disabled={approving || releasing}
@@ -472,6 +485,46 @@ export const Milestones: React.FC = () => {
                                 <Play className="w-3 h-3 fill-current" />
                                 {milestone.status === 'FAILED' ? 'Retry Payment Release' : 'Release Payment via PayPal'}
                               </button>
+                            )}
+                            {milestone.status === 'PAYMENT_PROCESSING' && (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      toast.loading('Confirming and releasing milestone payment...');
+                                      await milestonesApi.complete(milestone.id);
+                                      toast.dismiss();
+                                      toast.success('Milestone completed! Funds released to student.');
+                                      fetchMilestones(page);
+                                    } catch (err: any) {
+                                      toast.dismiss();
+                                      toast.error(err.response?.data?.message || 'Failed to complete milestone');
+                                    }
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold text-xs shadow-md shadow-emerald-500/20 flex items-center gap-1.5 transition-all"
+                                  title="Mark this milestone completed and release payment"
+                                >
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  Complete Milestone
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handlePay(
+                                      milestone.id,
+                                      milestone.amount,
+                                      milestone.title
+                                    )
+                                  }
+                                  disabled={releasing}
+                                  className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-semibold text-xs border border-white/10 flex items-center gap-1 transition-all"
+                                  title="Re-open PayPal checkout popup"
+                                >
+                                  <Play className="w-3 h-3 fill-current text-amber-400" />
+                                  PayPal
+                                </button>
+                              </div>
                             )}
                             {milestone.status === 'RELEASED' && (
                               <Link
