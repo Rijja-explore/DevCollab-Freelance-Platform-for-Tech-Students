@@ -1,5 +1,7 @@
 package com.devcollab.discovery.controller;
 
+import com.devcollab.discovery.dto.PageResponse;
+import com.devcollab.discovery.dto.ProjectSearchCriteria;
 import com.devcollab.discovery.entity.Project;
 import com.devcollab.discovery.service.ProjectService;
 import lombok.AllArgsConstructor;
@@ -76,6 +78,65 @@ public class ProjectController {
         response.put("success", true);
         response.put("data", results);
         response.put("count", results.size());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/advanced-search")
+    public ResponseEntity<Map<String, Object>> advancedSearchGet(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) List<String> skills,
+            @RequestParam(required = false) Boolean allSkills,
+            @RequestParam(required = false) BigDecimal minBudget,
+            @RequestParam(required = false) BigDecimal maxBudget,
+            @RequestParam(required = false) String currency,
+            @RequestParam(required = false) String startupId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection) {
+
+        String kw = (keyword != null && !keyword.isBlank()) ? keyword : q;
+        ProjectSearchCriteria criteria = ProjectSearchCriteria.builder()
+                .keyword(kw)
+                .category(category)
+                .status(status)
+                .skills(skills)
+                .allSkills(allSkills)
+                .minBudget(minBudget)
+                .maxBudget(maxBudget)
+                .currency(currency)
+                .startupId(startupId)
+                .page(page)
+                .size(size)
+                .sortBy(sortBy)
+                .sortDirection(sortDirection)
+                .build();
+
+        PageResponse<Project> result = projectService.searchProjectsAdvanced(criteria);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("data", result.getContent());
+        response.put("page", result.getPage());
+        response.put("size", result.getSize());
+        response.put("totalElements", result.getTotalElements());
+        response.put("totalPages", result.getTotalPages());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/advanced-search")
+    public ResponseEntity<Map<String, Object>> advancedSearchPost(
+            @RequestBody ProjectSearchCriteria criteria) {
+        PageResponse<Project> result = projectService.searchProjectsAdvanced(criteria);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("data", result.getContent());
+        response.put("page", result.getPage());
+        response.put("size", result.getSize());
+        response.put("totalElements", result.getTotalElements());
+        response.put("totalPages", result.getTotalPages());
         return ResponseEntity.ok(response);
     }
 

@@ -43,6 +43,10 @@ public class StudentProfile {
     @Builder.Default
     private Double rating = 4.8;
 
+    @Column(name = "review_count")
+    @Builder.Default
+    private Integer reviewCount = 0;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "student_skills", joinColumns = @JoinColumn(name = "student_id"))
     @Column(name = "skill", length = 100)
@@ -60,6 +64,9 @@ public class StudentProfile {
         }
         if (this.rating == null) {
             this.rating = 4.8;
+        }
+        if (this.reviewCount == null) {
+            this.reviewCount = 0;
         }
     }
 }

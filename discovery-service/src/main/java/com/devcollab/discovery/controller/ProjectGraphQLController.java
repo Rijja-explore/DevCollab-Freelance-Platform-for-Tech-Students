@@ -1,19 +1,29 @@
 package com.devcollab.discovery.controller;
 
+import com.devcollab.discovery.auth.JwtTokenService;
+import com.devcollab.discovery.dto.*;
+import com.devcollab.discovery.entity.ProfileReview;
 import com.devcollab.discovery.entity.Project;
 import com.devcollab.discovery.entity.ProjectStatus;
 import com.devcollab.discovery.entity.StudentProfile;
 import com.devcollab.discovery.repository.StudentProfileRepository;
 import com.devcollab.discovery.service.MatchingService;
+import com.devcollab.discovery.service.ProfileReviewService;
 import com.devcollab.discovery.service.ProjectService;
-import com.devcollab.discovery.auth.JwtTokenService;
 import com.devcollab.discovery.skillgap.SkillGapService;
 import com.devcollab.discovery.skillgap.SkillGapTypes.SkillGapAnalysis;
+import com.devcollab.discovery.specification.StudentProfileSpecification;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -30,6 +40,7 @@ public class ProjectGraphQLController {
     private final ProjectService projectService;
     private final MatchingService matchingService;
     private final StudentProfileRepository studentProfileRepository;
+    private final ProfileReviewService profileReviewService;
     private final SkillGapService skillGapService;
     private final JwtTokenService jwtTokenService;
     private final HttpServletRequest request;
@@ -49,13 +60,85 @@ public class ProjectGraphQLController {
 
     @QueryMapping
     public List<Project> searchProjects(@Argument String keyword, @Argument List<String> skills,
-                                       @Argument String category) {
+                                        @Argument String category) {
         return projectService.searchProjects(keyword, skills, category);
+    }
+
+    @QueryMapping
+    public PageResponse<Project> advancedSearchProjects(@Argument ProjectFilterInput filter) {
+        ProjectSearchCriteria criteria = ProjectSearchCriteria.builder()
+                .keyword(filter.getKeyword())
+                .category(filter.getCategory())
+                .status(filter.getStatus())
+                .skills(filter.getSkills())
+                .allSkills(filter.getAllSkills())
+                .minBudget(filter.getMinBudget() != null ? BigDecimal.valueOf(filter.getMinBudget()) : null)
+                .maxBudget(filter.getMaxBudget() != null ? BigDecimal.valueOf(filter.getMaxBudget()) : null)
+                .currency(filter.getCurrency())
+                .startupId(filter.getStartupId())
+                .page(filter.getPage() != null ? filter.getPage() : 0)
+                .size(filter.getSize() != null ? filter.getSize() : 20)
+                .sortBy(filter.getSortBy() != null ? filter.getSortBy() : "createdAt")
+                .sortDirection(filter.getSortDirection() != null ? filter.getSortDirection() : "desc")
+                .build();
+        return projectService.searchProjectsAdvanced(criteria);
+    }
+
+    @QueryMapping
+    public PageResponse<StudentProfile> advancedSearchStudents(@Argument StudentFilterInput filter) {
+        StudentSearchCriteria criteria = StudentSearchCriteria.builder()
+                .keyword(filter.getKeyword())
+                .skills(filter.getSkills())
+                .allSkills(filter.getAllSkills())
+                .minRating(filter.getMinRating())
+                .maxRating(filter.getMaxRating())
+                .minHourlyRate(filter.getMinHourlyRate() != null ? BigDecimal.valueOf(filter.getMinHourlyRate()) : null)
+                .maxHourlyRate(filter.getMaxHourlyRate() != null ? BigDecimal.valueOf(filter.getMaxHourlyRate()) : null)
+                .page(filter.getPage() != null ? filter.getPage() : 0)
+                .size(filter.getSize() != null ? filter.getSize() : 20)
+                .sortBy(filter.getSortBy() != null ? filter.getSortBy() : "rating")
+                .sortDirection(filter.getSortDirection() != null ? filter.getSortDirection() : "desc")
+                .build();
+
+        String sortBy = criteria.getSortBy() != null ? criteria.getSortBy() : "rating";
+        Sort.Direction direction = "asc".equalsIgnoreCase(criteria.getSortDirection())
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+
+        PageRequest pageRequest = PageRequest.of(
+                Math.max(0, criteria.getPage()),
+                Math.max(1, criteria.getSize()),
+                Sort.by(direction, sortBy)
+        );
+
+        Page<StudentProfile> result = studentProfileRepository.findAll(StudentProfileSpecification.build(criteria), pageRequest);
+        return PageResponse.from(result);
     }
 
     @QueryMapping
     public List<MatchingService.ProjectRecommendation> matchRecommendations(@Argument String studentId) {
         return matchingService.getRecommendations(studentId);
+    }
+
+    @QueryMapping
+    public List<MatchingService.CandidateRecommendation> candidateRecommendations(
+            @Argument String projectId, @Argument Integer limit) {
+        int lim = limit != null ? limit : 10;
+        return matchingService.getRecommendedCandidatesForProject(projectId, lim);
+    }
+
+    @QueryMapping
+    public List<MatchingService.SimilarProjectRecommendation> similarProjects(
+            @Argument String projectId, @Argument Integer limit) {
+        int lim = limit != null ? limit : 6;
+        return matchingService.getSimilarProjects(projectId, lim);
+    }
+
+    @QueryMapping
+    public List<MatchingService.SimilarStudentRecommendation> similarStudents(
+            @Argument String studentId, @Argument Integer limit) {
+        int lim = limit != null ? limit : 6;
+        return matchingService.getSimilarStudents(studentId, lim);
     }
 
     @QueryMapping
@@ -68,6 +151,30 @@ public class ProjectGraphQLController {
     @QueryMapping
     public List<StudentProfile> allStudentProfiles() {
         return studentProfileRepository.findAll();
+    }
+
+    @QueryMapping
+    public List<ProfileReview> studentReviews(
+            @Argument String studentId, @Argument Integer page, @Argument Integer size) {
+        int p = page != null ? page : 0;
+        int s = size != null ? size : 10;
+        return profileReviewService.getReviewsForStudent(studentId, p, s).getContent();
+    }
+
+    @QueryMapping
+    public ReviewSummaryGqlDto studentReviewSummary(@Argument String studentId) {
+        ReviewSummaryDto summary = profileReviewService.getReviewSummary(studentId);
+        List<RatingDistributionEntryGqlDto> dist = new ArrayList<>();
+        if (summary.getRatingDistribution() != null) {
+            summary.getRatingDistribution().forEach((stars, count) ->
+                    dist.add(new RatingDistributionEntryGqlDto(stars, count.intValue())));
+        }
+        return ReviewSummaryGqlDto.builder()
+                .studentId(summary.getStudentId())
+                .averageRating(summary.getAverageRating())
+                .totalReviews(summary.getTotalReviews() != null ? summary.getTotalReviews().intValue() : 0)
+                .distribution(dist)
+                .build();
     }
 
     @QueryMapping
@@ -147,6 +254,25 @@ public class ProjectGraphQLController {
         return studentProfileRepository.save(profile);
     }
 
+    @MutationMapping
+    public ProfileReview addProfileReview(@Argument String studentId, @Argument CreateProfileReviewInput input) {
+        CreateReviewDto dto = CreateReviewDto.builder()
+                .reviewerId(input.getReviewerId())
+                .reviewerName(input.getReviewerName())
+                .projectId(input.getProjectId())
+                .rating(input.getRating())
+                .title(input.getTitle())
+                .comment(input.getComment())
+                .build();
+        return profileReviewService.addReview(studentId, dto);
+    }
+
+    @MutationMapping
+    public Boolean deleteProfileReview(@Argument String reviewId) {
+        profileReviewService.deleteReview(reviewId);
+        return true;
+    }
+
     @Data
     public static class CreateProjectInput {
         private String startupId;
@@ -166,5 +292,67 @@ public class ProjectGraphQLController {
         private String bio;
         private Double hourlyRate;
         private List<String> skills;
+    }
+
+    @Data
+    public static class ProjectFilterInput {
+        private String keyword;
+        private String category;
+        private String status;
+        private List<String> skills;
+        private Boolean allSkills;
+        private Double minBudget;
+        private Double maxBudget;
+        private String currency;
+        private String startupId;
+        private Integer page;
+        private Integer size;
+        private String sortBy;
+        private String sortDirection;
+    }
+
+    @Data
+    public static class StudentFilterInput {
+        private String keyword;
+        private List<String> skills;
+        private Boolean allSkills;
+        private Double minRating;
+        private Double maxRating;
+        private Double minHourlyRate;
+        private Double maxHourlyRate;
+        private Integer page;
+        private Integer size;
+        private String sortBy;
+        private String sortDirection;
+    }
+
+    @Data
+    public static class CreateProfileReviewInput {
+        private String reviewerId;
+        private String reviewerName;
+        private String projectId;
+        private Integer rating;
+        private String title;
+        private String comment;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ReviewSummaryGqlDto {
+        private String studentId;
+        private Double averageRating;
+        private Integer totalReviews;
+        private List<RatingDistributionEntryGqlDto> distribution;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RatingDistributionEntryGqlDto {
+        private Integer stars;
+        private Integer count;
     }
 }

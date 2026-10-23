@@ -19,6 +19,7 @@ type StudentProfile {
     bio: String
     hourlyRate: Float
     rating: Float!
+    reviewCount: Int
     skills: [String!]!
 }
 
@@ -26,6 +27,72 @@ type ProjectRecommendation {
     project: Project!
     matchScore: Float!
     matchingSkills: [String!]!
+    fitReason: String
+}
+
+type CandidateRecommendation {
+    student: StudentProfile!
+    matchScore: Float!
+    matchingSkills: [String!]!
+    missingSkills: [String!]!
+    fitReason: String!
+}
+
+type SimilarProjectRecommendation {
+    project: Project!
+    similarityScore: Float!
+    sharedSkills: [String!]!
+}
+
+type SimilarStudentRecommendation {
+    student: StudentProfile!
+    similarityScore: Float!
+    sharedSkills: [String!]!
+}
+
+type ProfileReview {
+    id: ID!
+    studentId: ID!
+    reviewerId: ID!
+    reviewerName: String!
+    projectId: ID
+    rating: Int!
+    title: String
+    comment: String
+    createdAt: String!
+    updatedAt: String
+}
+
+type RatingDistributionEntry {
+    stars: Int!
+    count: Int!
+}
+
+type ReviewSummary {
+    studentId: ID!
+    averageRating: Float!
+    totalReviews: Int!
+    distribution: [RatingDistributionEntry!]!
+}
+
+type ProjectPage {
+    content: [Project!]!
+    page: Int!
+    size: Int!
+    totalElements: Int!
+    totalPages: Int!
+    first: Boolean!
+    last: Boolean!
+}
+
+type StudentProfilePage {
+    content: [StudentProfile!]!
+    page: Int!
+    size: Int!
+    totalElements: Int!
+    totalPages: Int!
+    first: Boolean!
+    last: Boolean!
 }
 
 type MatchResult {
@@ -86,13 +153,59 @@ input CreateStudentProfileInput {
     skills: [String!]!
 }
 
+input ProjectFilterInput {
+    keyword: String
+    category: String
+    status: String
+    skills: [String!]
+    allSkills: Boolean
+    minBudget: Float
+    maxBudget: Float
+    currency: String
+    startupId: ID
+    page: Int
+    size: Int
+    sortBy: String
+    sortDirection: String
+}
+
+input StudentFilterInput {
+    keyword: String
+    skills: [String!]
+    allSkills: Boolean
+    minRating: Float
+    maxRating: Float
+    minHourlyRate: Float
+    maxHourlyRate: Float
+    page: Int
+    size: Int
+    sortBy: String
+    sortDirection: String
+}
+
+input CreateProfileReviewInput {
+    reviewerId: ID!
+    reviewerName: String!
+    projectId: ID
+    rating: Int!
+    title: String
+    comment: String
+}
+
 type Query {
     projects(category: String, status: String, page: Int, size: Int): [Project!]!
     project(id: ID!): Project
     searchProjects(keyword: String, skills: [String], category: String): [Project!]!
+    advancedSearchProjects(filter: ProjectFilterInput!): ProjectPage!
+    advancedSearchStudents(filter: StudentFilterInput!): StudentProfilePage!
     matchRecommendations(studentId: ID!): [ProjectRecommendation!]!
+    candidateRecommendations(projectId: ID!, limit: Int): [CandidateRecommendation!]!
+    similarProjects(projectId: ID!, limit: Int): [SimilarProjectRecommendation!]!
+    similarStudents(studentId: ID!, limit: Int): [SimilarStudentRecommendation!]!
     studentProfile(id: ID!): StudentProfile
     allStudentProfiles: [StudentProfile!]!
+    studentReviews(studentId: ID!, page: Int, size: Int): [ProfileReview!]!
+    studentReviewSummary(studentId: ID!): ReviewSummary!
     skillGap(studentId: ID!, projectId: ID!): SkillGapAnalysis!
     analyzeMySkillGap(projectId: ID!): SkillGapAnalysis!
 }
@@ -102,4 +215,6 @@ type Mutation {
     updateProjectStatus(id: ID!, status: String!): Project!
     matchProject(projectId: ID!, studentId: ID!): MatchResult!
     createStudentProfile(input: CreateStudentProfileInput!): StudentProfile!
+    addProfileReview(studentId: ID!, input: CreateProfileReviewInput!): ProfileReview!
+    deleteProfileReview(reviewId: ID!): Boolean!
 }

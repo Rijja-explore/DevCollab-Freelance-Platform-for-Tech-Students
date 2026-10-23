@@ -10,10 +10,14 @@ public enum AuditAction {
 
     // Milestone actions
     MILESTONE_CREATED,
+    MILESTONE_STARTED,
     MILESTONE_SUBMITTED,
+    MILESTONE_CHANGES_REQUESTED,
     MILESTONE_APPROVED,
     MILESTONE_REJECTED,
     MILESTONE_DISPUTED,
+    DISPUTE_RAISED,
+    DISPUTE_RESOLVED,
 
     // Payment actions
     PAYMENT_INITIATED,
@@ -26,7 +30,8 @@ public enum AuditAction {
     WEBHOOK_VERIFIED,
     WEBHOOK_REJECTED,
 
-    // System events
+    // Reminders & System events
+    REMINDER_SENT,
     EVENT_CONSUMED,
     EVENT_PUBLISHED,
     DUPLICATE_EVENT_IGNORED

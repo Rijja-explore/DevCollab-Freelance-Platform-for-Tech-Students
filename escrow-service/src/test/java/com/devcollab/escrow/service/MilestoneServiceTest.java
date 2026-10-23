@@ -1,6 +1,11 @@
 package com.devcollab.escrow.service;
 
 import com.devcollab.escrow.audit.AuditService;
+import com.devcollab.escrow.dto.request.DisputeMilestoneRequest;
+import com.devcollab.escrow.dto.request.RequestChangesRequest;
+import com.devcollab.escrow.dto.request.ResolveDisputeRequest;
+import com.devcollab.escrow.dto.request.SubmitMilestoneRequest;
+import com.devcollab.escrow.dto.response.MilestoneResponse;
 import com.devcollab.escrow.entity.Contract;
 import com.devcollab.escrow.entity.Milestone;
 import com.devcollab.escrow.entity.Transaction;
@@ -25,6 +30,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -75,20 +81,17 @@ class MilestoneServiceTest {
     @Test
     @DisplayName("Should return existing milestone safely when milestone is already RELEASED")
     void releaseMilestone_ShouldReturnExisting_WhenAlreadyReleased() {
-        // Given
         milestone.setStatus(MilestoneStatus.RELEASED);
         given(milestoneRepository.findById(milestone.getId()))
                 .willReturn(Optional.of(milestone));
         given(milestoneMapper.toResponse(milestone))
-                .willReturn(com.devcollab.escrow.dto.response.MilestoneResponse.builder()
+                .willReturn(MilestoneResponse.builder()
                         .id(milestone.getId())
                         .status(MilestoneStatus.RELEASED)
                         .build());
 
-        // When
         var response = milestoneService.releaseMilestone(milestone.getId(), "startup@test.com");
 
-        // Then
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(MilestoneStatus.RELEASED);
         then(paymentService).should(never()).createOrder(any());
@@ -97,12 +100,9 @@ class MilestoneServiceTest {
     @Test
     @DisplayName("Should reject release when payment is already PROCESSING")
     void releaseMilestone_ShouldThrow_WhenPaymentInProgress() {
-        // Given
         milestone.setStatus(MilestoneStatus.PAYMENT_PROCESSING);
-        given(milestoneRepository.findById(milestone.getId()))
-                .willReturn(Optional.of(milestone));
+        given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
 
-        // When / Then
         assertThatThrownBy(() -> milestoneService.releaseMilestone(milestone.getId(), "startup@test.com"))
                 .isInstanceOf(EscrowException.class)
                 .hasMessageContaining("already being processed");
@@ -110,13 +110,10 @@ class MilestoneServiceTest {
 
     @Test
     @DisplayName("Should reject release when milestone is not APPROVED")
-    void releaseMilestone_ShouldThrow_WhenNotApproved() {
-        // Given
-        milestone.setStatus(MilestoneStatus.PENDING);
-        given(milestoneRepository.findById(milestone.getId()))
-                .willReturn(Optional.of(milestone));
+    void releaseMilestone_ShouldThrow_WhenMilestoneNotApproved() {
+        milestone.setStatus(MilestoneStatus.IN_PROGRESS);
+        given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
 
-        // When / Then
         assertThatThrownBy(() -> milestoneService.releaseMilestone(milestone.getId(), "startup@test.com"))
                 .isInstanceOf(EscrowException.class)
                 .hasMessageContaining("APPROVED milestones");
@@ -125,14 +122,10 @@ class MilestoneServiceTest {
     @Test
     @DisplayName("Should reject release when successful transaction already exists (idempotency)")
     void releaseMilestone_ShouldThrow_WhenSuccessfulTransactionExists() {
-        // Given
-        given(milestoneRepository.findById(milestone.getId()))
-                .willReturn(Optional.of(milestone));
-        given(transactionRepository.existsByMilestoneIdAndStatus(
-                milestone.getId(), TransactionStatus.SUCCESS))
+        given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
+        given(transactionRepository.existsByMilestoneIdAndStatus(milestone.getId(), TransactionStatus.SUCCESS))
                 .willReturn(true);
 
-        // When / Then
         assertThatThrownBy(() -> milestoneService.releaseMilestone(milestone.getId(), "startup@test.com"))
                 .isInstanceOf(DuplicateReleaseException.class);
     }
@@ -140,7 +133,6 @@ class MilestoneServiceTest {
     @Test
     @DisplayName("Should create payment order and transition to PAYMENT_PROCESSING on success")
     void releaseMilestone_ShouldCreateOrder_WhenApproved() {
-        // Given
         given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
         given(transactionRepository.existsByMilestoneIdAndStatus(any(), any())).willReturn(false);
         given(paymentService.createOrder(any())).willReturn(PaymentResult.builder()
@@ -153,46 +145,179 @@ class MilestoneServiceTest {
         given(transactionRepository.save(any(Transaction.class))).willAnswer(inv -> inv.getArgument(0));
         given(milestoneRepository.save(any(Milestone.class))).willAnswer(inv -> inv.getArgument(0));
         given(milestoneMapper.toResponse(any(Milestone.class))).willReturn(
-                com.devcollab.escrow.dto.response.MilestoneResponse.builder()
+                MilestoneResponse.builder()
                         .id(milestone.getId())
                         .status(MilestoneStatus.PAYMENT_PROCESSING)
                         .build());
 
-        // When
         var result = milestoneService.releaseMilestone(milestone.getId(), "startup@test.com");
 
-        // Then
         assertThat(result).isNotNull();
         then(paymentService).should().createOrder(any());
-        then(transactionRepository).should().save(argThat(tx ->
-                tx.getStatus() == TransactionStatus.PENDING));
-        then(milestoneRepository).should().save(argThat(m ->
-                m.getStatus() == MilestoneStatus.PAYMENT_PROCESSING));
+        then(transactionRepository).should().save(argThat(tx -> tx.getStatus() == TransactionStatus.PENDING));
+        then(milestoneRepository).should().save(argThat(m -> m.getStatus() == MilestoneStatus.PAYMENT_PROCESSING));
     }
 
     @Test
     @DisplayName("Should mark milestone FAILED when payment order creation fails")
     void releaseMilestone_ShouldMarkFailed_WhenProviderFails() {
-        // Given
         given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
         given(transactionRepository.existsByMilestoneIdAndStatus(any(), any())).willReturn(false);
         given(paymentService.createOrder(any())).willReturn(PaymentResult.failure("Payment provider connection error"));
         given(transactionRepository.save(any(Transaction.class))).willAnswer(inv -> inv.getArgument(0));
         given(milestoneRepository.save(any(Milestone.class))).willAnswer(inv -> inv.getArgument(0));
         given(milestoneMapper.toResponse(any(Milestone.class))).willReturn(
-                com.devcollab.escrow.dto.response.MilestoneResponse.builder()
+                MilestoneResponse.builder()
                         .id(milestone.getId())
                         .status(MilestoneStatus.FAILED)
                         .build());
 
-        // When
         var result = milestoneService.releaseMilestone(milestone.getId(), "startup@test.com");
 
-        // Then
-        then(transactionRepository).should().save(argThat(tx ->
-                tx.getStatus() == TransactionStatus.FAILED));
-        then(milestoneRepository).should().save(argThat(m ->
-                m.getStatus() == MilestoneStatus.FAILED));
+        then(transactionRepository).should().save(argThat(tx -> tx.getStatus() == TransactionStatus.FAILED));
+        then(milestoneRepository).should().save(argThat(m -> m.getStatus() == MilestoneStatus.FAILED));
         then(eventPublisher).should().publishPaymentFailed(any());
+    }
+
+    @Test
+    @DisplayName("Should start milestone and record started_at")
+    void startMilestone_ShouldTransitionToInProgress() {
+        milestone.setStatus(MilestoneStatus.PENDING);
+        given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
+        given(milestoneMapper.toResponse(any())).willReturn(
+                MilestoneResponse.builder()
+                        .id(milestone.getId())
+                        .status(MilestoneStatus.IN_PROGRESS)
+                        .build());
+
+        var result = milestoneService.startMilestone(milestone.getId(), "student@test.com");
+
+        assertThat(result.getStatus()).isEqualTo(MilestoneStatus.IN_PROGRESS);
+        assertThat(milestone.getStatus()).isEqualTo(MilestoneStatus.IN_PROGRESS);
+        assertThat(milestone.getStartedAt()).isNotNull();
+        then(milestoneRepository).should().save(milestone);
+    }
+
+    @Test
+    @DisplayName("Should submit milestone deliverable and update status to SUBMITTED")
+    void submitMilestone_ShouldSetDeliverableAndSubmittedStatus() {
+        milestone.setStatus(MilestoneStatus.IN_PROGRESS);
+        given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
+        given(milestoneMapper.toResponse(any())).willReturn(
+                MilestoneResponse.builder()
+                        .id(milestone.getId())
+                        .status(MilestoneStatus.SUBMITTED)
+                        .build());
+
+        SubmitMilestoneRequest request = SubmitMilestoneRequest.builder()
+                .deliverableUrl("https://github.com/devcollab/pull/1")
+                .submissionNotes("Completed Phase 1 with tests")
+                .build();
+
+        var result = milestoneService.submitMilestone(milestone.getId(), request, "student@test.com");
+
+        assertThat(result.getStatus()).isEqualTo(MilestoneStatus.SUBMITTED);
+        assertThat(milestone.getStatus()).isEqualTo(MilestoneStatus.SUBMITTED);
+        assertThat(milestone.getDeliverableUrl()).isEqualTo("https://github.com/devcollab/pull/1");
+        assertThat(milestone.getSubmittedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should request changes, increment revision count and reset to IN_PROGRESS")
+    void requestChanges_ShouldIncrementRevisionsAndResetStatus() {
+        milestone.setStatus(MilestoneStatus.SUBMITTED);
+        milestone.setRevisionCount(0);
+        given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
+        given(milestoneMapper.toResponse(any())).willReturn(
+                MilestoneResponse.builder()
+                        .id(milestone.getId())
+                        .status(MilestoneStatus.IN_PROGRESS)
+                        .revisionCount(1)
+                        .build());
+
+        RequestChangesRequest request = RequestChangesRequest.builder()
+                .reviewFeedback("Please add unit test coverage for the payment endpoint")
+                .build();
+
+        var result = milestoneService.requestChanges(milestone.getId(), request, "startup@test.com");
+
+        assertThat(milestone.getStatus()).isEqualTo(MilestoneStatus.IN_PROGRESS);
+        assertThat(milestone.getRevisionCount()).isEqualTo(1);
+        assertThat(milestone.getReviewFeedback()).contains("Please add unit test coverage");
+    }
+
+    @Test
+    @DisplayName("Should enforce sequential release and reject milestone 2 if milestone 1 is not released")
+    void sequentialRelease_ShouldRejectWhenPrecedingMilestoneNotReleased() {
+        Milestone milestone2 = Milestone.builder()
+                .id(UUID.randomUUID())
+                .contract(contract)
+                .title("Phase 2")
+                .sequenceOrder(2)
+                .status(MilestoneStatus.SUBMITTED)
+                .build();
+
+        Milestone milestone1 = Milestone.builder()
+                .id(UUID.randomUUID())
+                .contract(contract)
+                .title("Phase 1")
+                .sequenceOrder(1)
+                .status(MilestoneStatus.IN_PROGRESS) // Not yet RELEASED!
+                .build();
+
+        given(milestoneRepository.findById(milestone2.getId())).willReturn(Optional.of(milestone2));
+        given(milestoneRepository.findPrecedingMilestones(contract.getId(), 2))
+                .willReturn(List.of(milestone1));
+
+        assertThatThrownBy(() -> milestoneService.approveMilestone(milestone2.getId(), UUID.randomUUID(), "startup@test.com"))
+                .isInstanceOf(EscrowException.class)
+                .hasMessageContaining("SEQUENTIAL_RELEASE_VIOLATION")
+                .hasMessageContaining("cannot be released/approved before preceding milestone");
+    }
+
+    @Test
+    @DisplayName("Should raise dispute and update contract status to DISPUTED")
+    void disputeMilestone_ShouldSetDisputeStatus() {
+        milestone.setStatus(MilestoneStatus.SUBMITTED);
+        given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
+        given(milestoneMapper.toResponse(any())).willReturn(
+                MilestoneResponse.builder()
+                        .id(milestone.getId())
+                        .status(MilestoneStatus.DISPUTED)
+                        .build());
+
+        DisputeMilestoneRequest request = DisputeMilestoneRequest.builder()
+                .reason("Deliverable does not meet scope requirements")
+                .build();
+
+        var result = milestoneService.disputeMilestone(milestone.getId(), request, "startup@test.com");
+
+        assertThat(milestone.getStatus()).isEqualTo(MilestoneStatus.DISPUTED);
+        assertThat(contract.getStatus()).isEqualTo(ContractStatus.DISPUTED);
+        assertThat(milestone.getDisputeReason()).contains("Deliverable does not meet scope");
+    }
+
+    @Test
+    @DisplayName("Should resolve dispute and unfreeze contract")
+    void resolveDispute_ShouldResolveAndRestoreContract() {
+        milestone.setStatus(MilestoneStatus.DISPUTED);
+        given(milestoneRepository.findById(milestone.getId())).willReturn(Optional.of(milestone));
+        given(milestoneRepository.countUnreleasedByContractId(contract.getId())).willReturn(1L);
+        given(milestoneMapper.toResponse(any())).willReturn(
+                MilestoneResponse.builder()
+                        .id(milestone.getId())
+                        .status(MilestoneStatus.IN_PROGRESS)
+                        .build());
+
+        ResolveDisputeRequest request = ResolveDisputeRequest.builder()
+                .resolution("REOPEN")
+                .resolutionNotes("Parties agreed to revise requirements")
+                .build();
+
+        var result = milestoneService.resolveDispute(milestone.getId(), request, "admin@test.com");
+
+        assertThat(milestone.getStatus()).isEqualTo(MilestoneStatus.IN_PROGRESS);
+        assertThat(contract.getStatus()).isEqualTo(ContractStatus.ACTIVE);
+        assertThat(milestone.getDisputeResolution()).isEqualTo("REOPEN");
     }
 }

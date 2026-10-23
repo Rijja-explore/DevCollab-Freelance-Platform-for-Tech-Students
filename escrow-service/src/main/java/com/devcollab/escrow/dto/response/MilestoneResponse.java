@@ -30,6 +30,16 @@ public class MilestoneResponse {
     private UUID transactionId;
     private String providerOrderId;
     private String approveUrl;
+    private String deliverableUrl;
+    private String submissionNotes;
+    private String reviewFeedback;
+    private Integer revisionCount;
+    private Instant startedAt;
+    private Instant submittedAt;
+    private String disputeReason;
+    private Instant disputedAt;
+    private Instant disputeResolvedAt;
+    private String disputeResolution;
     private Instant createdAt;
     private Instant updatedAt;
 }

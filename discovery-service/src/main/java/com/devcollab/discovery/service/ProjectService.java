@@ -1,10 +1,13 @@
 package com.devcollab.discovery.service;
 
 import com.devcollab.discovery.document.ProjectDocument;
+import com.devcollab.discovery.dto.PageResponse;
+import com.devcollab.discovery.dto.ProjectSearchCriteria;
 import com.devcollab.discovery.entity.Project;
 import com.devcollab.discovery.entity.ProjectStatus;
 import com.devcollab.discovery.repository.ProjectElasticsearchRepository;
 import com.devcollab.discovery.repository.ProjectRepository;
+import com.devcollab.discovery.specification.ProjectSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -12,6 +15,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -81,7 +85,6 @@ public class ProjectService {
 
         // Index in Elasticsearch
         try {
-            // Convert skills to lowercase for consistent searching
             List<String> indexedSkills = saved.getRequiredSkills() != null
                 ? saved.getRequiredSkills().stream()
                     .map(String::toLowerCase)
@@ -109,21 +112,38 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
+    public PageResponse<Project> searchProjectsAdvanced(ProjectSearchCriteria criteria) {
+        String sortBy = criteria.getSortBy();
+        if (sortBy == null || sortBy.isBlank()) {
+            sortBy = "createdAt";
+        }
+        Sort.Direction direction = "asc".equalsIgnoreCase(criteria.getSortDirection())
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+
+        PageRequest pageRequest = PageRequest.of(
+                Math.max(0, criteria.getPage()),
+                Math.max(1, criteria.getSize()),
+                Sort.by(direction, sortBy)
+        );
+
+        Specification<Project> spec = ProjectSpecification.build(criteria);
+        Page<Project> pageResult = projectRepository.findAll(spec, pageRequest);
+        return PageResponse.from(pageResult);
+    }
+
+    @Transactional(readOnly = true)
     public List<Project> searchProjects(String keyword, List<String> skills, String category) {
         // Try Elasticsearch first for full-text search
         try {
             List<ProjectDocument> docs = new ArrayList<>();
             
             if (keyword != null && !keyword.isBlank()) {
-                // Search keyword in title, description, AND skills
                 List<ProjectDocument> keywordDocs = elasticsearchRepository.findByTitleContainingOrDescriptionContaining(keyword, keyword);
-                
-                // Also search for skills matching the keyword (if keyword looks like a skill)
                 String lowerKeyword = keyword.toLowerCase();
                 List<String> possibleSkills = List.of(lowerKeyword);
                 List<ProjectDocument> skillDocs = elasticsearchRepository.findBySkillsIn(possibleSkills);
                 
-                // Combine results
                 Set<ProjectDocument> combinedSet = new HashSet<>();
                 combinedSet.addAll(keywordDocs);
                 combinedSet.addAll(skillDocs);
@@ -135,9 +155,7 @@ public class ProjectService {
                 }
             }
             
-            // Search by skills in Elasticsearch
             if (skills != null && !skills.isEmpty()) {
-                // Convert skills to lowercase for case-insensitive matching
                 List<String> lowerSkills = skills.stream()
                     .map(String::toLowerCase)
                     .collect(Collectors.toList());
@@ -156,7 +174,6 @@ public class ProjectService {
                 }
             }
             
-            // If no filters provided or no results from Elasticsearch, return all
             if (keyword == null && (skills == null || skills.isEmpty()) && category == null) {
                 return projectRepository.findAll();
             }
@@ -169,11 +186,9 @@ public class ProjectService {
         List<Project> results = new ArrayList<>();
         
         if (keyword != null && !keyword.isBlank()) {
-            // Search keyword in PostgreSQL (title, description)
             List<Project> keywordResults = projectRepository.searchByKeyword(keyword);
             results.addAll(keywordResults);
             
-            // Also try to find skills matching the keyword
             String lowerKeyword = keyword.toLowerCase();
             List<Project> skillResults = projectRepository.findBySkillsIn(List.of(lowerKeyword));
             results.addAll(skillResults);
@@ -188,7 +203,6 @@ public class ProjectService {
             if (results.isEmpty()) {
                 results.addAll(skillResults);
             } else {
-                // Intersection with existing results
                 Set<String> existingIds = results.stream().map(Project::getId).collect(Collectors.toSet());
                 results = skillResults.stream()
                     .filter(p -> existingIds.contains(p.getId()))
@@ -202,7 +216,6 @@ public class ProjectService {
             if (results.isEmpty()) {
                 results.addAll(categoryResults);
             } else {
-                // Intersection with existing results
                 Set<String> existingIds = results.stream().map(Project::getId).collect(Collectors.toSet());
                 results = categoryResults.stream()
                     .filter(p -> existingIds.contains(p.getId()))
@@ -210,7 +223,6 @@ public class ProjectService {
             }
         }
         
-        // Remove duplicates
         Set<String> seenIds = new HashSet<>();
         List<Project> uniqueResults = new ArrayList<>();
         for (Project project : results) {

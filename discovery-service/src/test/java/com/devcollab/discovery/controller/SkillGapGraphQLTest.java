@@ -4,6 +4,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.devcollab.discovery.auth.JwtTokenService;
 import com.devcollab.discovery.repository.StudentProfileRepository;
 import com.devcollab.discovery.service.MatchingService;
+import com.devcollab.discovery.service.ProfileReviewService;
 import com.devcollab.discovery.service.ProjectService;
 import com.devcollab.discovery.skillgap.SkillGapService;
 import com.devcollab.discovery.skillgap.SkillGapTypes.SkillGapAnalysis;
@@ -28,6 +29,7 @@ class SkillGapGraphQLTest {
     @MockBean private ProjectService projectService;
     @MockBean private MatchingService matchingService;
     @MockBean private StudentProfileRepository studentProfileRepository;
+    @MockBean private ProfileReviewService profileReviewService;
     @MockBean private SkillGapService skillGapService;
     @MockBean private JwtTokenService jwtTokenService;
     @MockBean private HttpServletRequest request;

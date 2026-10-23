@@ -67,6 +67,18 @@ public class MatchController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/recommendations/project/{projectId}")
+    public ResponseEntity<Map<String, Object>> getProjectCandidateRecommendations(
+            @PathVariable String projectId,
+            @RequestParam(defaultValue = "10") int limit) {
+        List<MatchingService.CandidateRecommendation> candidates = matchingService.getRecommendedCandidatesForProject(projectId, limit);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("data", candidates);
+        response.put("count", candidates.size());
+        return ResponseEntity.ok(response);
+    }
+
     @Data
     public static class MatchRequestDto {
         private String projectId;

@@ -1,7 +1,6 @@
 package com.devcollab.escrow.controller;
 
-import com.devcollab.escrow.dto.request.CreateMilestoneRequest;
-import com.devcollab.escrow.dto.request.UpdateMilestoneRequest;
+import com.devcollab.escrow.dto.request.*;
 import com.devcollab.escrow.dto.response.ApiResponse;
 import com.devcollab.escrow.dto.response.MilestoneResponse;
 import com.devcollab.escrow.dto.response.PageResponse;
@@ -71,9 +70,47 @@ public class MilestoneController {
                 milestoneService.updateMilestone(id, request, principal != null ? principal.getEmail() : "system")));
     }
 
+    @PostMapping("/{id}/start")
+    @PreAuthorize("hasAnyRole('STUDENT', 'STARTUP', 'ADMIN')")
+    @Operation(summary = "Start working on a milestone")
+    public ResponseEntity<ApiResponse<MilestoneResponse>> startMilestone(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        String actor = principal != null ? principal.getEmail() : "system";
+        MilestoneResponse response = milestoneService.startMilestone(id, actor);
+        return ResponseEntity.ok(ApiResponse.success(response, "Milestone work started"));
+    }
+
+    @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    @Operation(summary = "Submit milestone deliverable for review")
+    public ResponseEntity<ApiResponse<MilestoneResponse>> submitMilestone(
+            @PathVariable UUID id,
+            @Valid @RequestBody(required = false) SubmitMilestoneRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        String actor = principal != null ? principal.getEmail() : "system";
+        MilestoneResponse response = milestoneService.submitMilestone(id, request, actor);
+        return ResponseEntity.ok(ApiResponse.success(response, "Milestone deliverable submitted for review"));
+    }
+
+    @PostMapping("/{id}/request-changes")
+    @PreAuthorize("hasAnyRole('STARTUP', 'ADMIN')")
+    @Operation(summary = "Request changes or revisions on a submitted deliverable")
+    public ResponseEntity<ApiResponse<MilestoneResponse>> requestChanges(
+            @PathVariable UUID id,
+            @Valid @RequestBody RequestChangesRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        String actor = principal != null ? principal.getEmail() : "system";
+        MilestoneResponse response = milestoneService.requestChanges(id, request, actor);
+        return ResponseEntity.ok(ApiResponse.success(response, "Changes requested for milestone deliverable"));
+    }
+
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('STARTUP', 'ADMIN')")
-    @Operation(summary = "Approve a submitted milestone and create a payment order")
+    @Operation(summary = "Approve a submitted milestone and prepare for payment release")
     public ResponseEntity<ApiResponse<MilestoneResponse>> approveMilestone(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -81,7 +118,7 @@ public class MilestoneController {
         UUID actorId = principal != null ? principal.getUserId() : UUID.randomUUID();
         String actorEmail = principal != null ? principal.getEmail() : "system";
         MilestoneResponse response = milestoneService.approveMilestone(id, actorId, actorEmail);
-        return ResponseEntity.ok(ApiResponse.success(response, "Milestone approved. Payment order created."));
+        return ResponseEntity.ok(ApiResponse.success(response, "Milestone approved. Ready for payment release."));
     }
 
     @PostMapping("/{id}/release")
@@ -103,12 +140,38 @@ public class MilestoneController {
                             .success(false)
                             .message("Payment order creation failed. You can retry payment.")
                             .error(ApiResponse.ErrorDetails.builder()
-                                    .code("PAYMENT_GATEWAY_ERROR")
+                                     .code("PAYMENT_GATEWAY_ERROR")
                                     .message("Payment order creation failed. Please retry payment.")
                                     .build())
                             .data(response)
                             .build());
         }
         return ResponseEntity.ok(ApiResponse.success(response, "Payment release initiated"));
+    }
+
+    @PostMapping("/{id}/dispute")
+    @PreAuthorize("hasAnyRole('STARTUP', 'STUDENT', 'ADMIN')")
+    @Operation(summary = "Raise a dispute on a milestone")
+    public ResponseEntity<ApiResponse<MilestoneResponse>> disputeMilestone(
+            @PathVariable UUID id,
+            @Valid @RequestBody DisputeMilestoneRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        String actor = principal != null ? principal.getEmail() : "system";
+        MilestoneResponse response = milestoneService.disputeMilestone(id, request, actor);
+        return ResponseEntity.ok(ApiResponse.success(response, "Milestone dispute raised"));
+    }
+
+    @PostMapping("/{id}/resolve-dispute")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Resolve a milestone dispute (Admin only)")
+    public ResponseEntity<ApiResponse<MilestoneResponse>> resolveDispute(
+            @PathVariable UUID id,
+            @Valid @RequestBody ResolveDisputeRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        String actor = principal != null ? principal.getEmail() : "admin";
+        MilestoneResponse response = milestoneService.resolveDispute(id, request, actor);
+        return ResponseEntity.ok(ApiResponse.success(response, "Milestone dispute resolved"));
     }
 }

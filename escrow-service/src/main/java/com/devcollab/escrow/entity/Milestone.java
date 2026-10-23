@@ -48,7 +48,7 @@ public class Milestone {
     @Column(name = "sequence_order", nullable = false)
     private Integer sequenceOrder;
 
-@Enumerated(EnumType.STRING)
+    @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 30)
     @Builder.Default
@@ -69,6 +69,37 @@ public class Milestone {
 
     @Column(name = "idempotency_key", unique = true, length = 100)
     private String idempotencyKey;
+
+    @Column(name = "deliverable_url", length = 500)
+    private String deliverableUrl;
+
+    @Column(name = "submission_notes", columnDefinition = "TEXT")
+    private String submissionNotes;
+
+    @Column(name = "review_feedback", columnDefinition = "TEXT")
+    private String reviewFeedback;
+
+    @Column(name = "revision_count", nullable = false)
+    @Builder.Default
+    private Integer revisionCount = 0;
+
+    @Column(name = "started_at")
+    private Instant startedAt;
+
+    @Column(name = "submitted_at")
+    private Instant submittedAt;
+
+    @Column(name = "dispute_reason", columnDefinition = "TEXT")
+    private String disputeReason;
+
+    @Column(name = "disputed_at")
+    private Instant disputedAt;
+
+    @Column(name = "dispute_resolved_at")
+    private Instant disputeResolvedAt;
+
+    @Column(name = "dispute_resolution", length = 50)
+    private String disputeResolution;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false, nullable = false)

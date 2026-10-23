@@ -1,5 +1,7 @@
 package com.devcollab.discovery.service;
 
+import com.devcollab.discovery.dto.PageResponse;
+import com.devcollab.discovery.dto.ProjectSearchCriteria;
 import com.devcollab.discovery.entity.Project;
 import com.devcollab.discovery.entity.ProjectStatus;
 import com.devcollab.discovery.repository.ProjectElasticsearchRepository;
@@ -10,6 +12,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -92,5 +98,26 @@ class ProjectServiceTest {
         assertNotNull(results);
         assertEquals(1, results.size());
         assertEquals("Fullstack Web Platform", results.get(0).getTitle());
+    }
+
+    @Test
+    void testSearchProjectsAdvancedExecutesSpecification() {
+        Page<Project> page = new PageImpl<>(List.of(testProject));
+        given(projectRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .willReturn(page);
+
+        ProjectSearchCriteria criteria = ProjectSearchCriteria.builder()
+                .keyword("Web")
+                .category("Web Development")
+                .minBudget(BigDecimal.valueOf(1000))
+                .maxBudget(BigDecimal.valueOf(3000))
+                .build();
+
+        PageResponse<Project> response = projectService.searchProjectsAdvanced(criteria);
+
+        assertNotNull(response);
+        assertEquals(1, response.getContent().size());
+        assertEquals("Fullstack Web Platform", response.getContent().get(0).getTitle());
+        assertEquals(1, response.getTotalElements());
     }
 }

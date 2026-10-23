@@ -2,8 +2,7 @@ package com.devcollab.escrow.service;
 
 import com.devcollab.escrow.audit.AuditAction;
 import com.devcollab.escrow.audit.AuditService;
-import com.devcollab.escrow.dto.request.CreateMilestoneRequest;
-import com.devcollab.escrow.dto.request.UpdateMilestoneRequest;
+import com.devcollab.escrow.dto.request.*;
 import com.devcollab.escrow.dto.response.MilestoneResponse;
 import com.devcollab.escrow.dto.response.PageResponse;
 import com.devcollab.escrow.entity.Contract;
@@ -34,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -69,6 +69,7 @@ public class MilestoneService {
                 .sequenceOrder(request.getSequenceOrder())
                 .dueDate(request.getDueDate())
                 .status(MilestoneStatus.PENDING)
+                .revisionCount(0)
                 .build();
 
         milestone = milestoneRepository.save(milestone);
@@ -108,11 +109,85 @@ public class MilestoneService {
     }
 
     /**
-     * Startup approves a milestone, triggering payment processing.
-     *
-     * Guards:
-     * - Only SUBMITTED milestones can be approved
-     * - Idempotency: if already in PAYMENT_PROCESSING or RELEASED, reject
+     * Start work on a milestone.
+     */
+    @Transactional
+    public MilestoneResponse startMilestone(UUID milestoneId, String actor) {
+        Milestone milestone = findMilestoneOrThrow(milestoneId);
+
+        if (milestone.getStatus() != MilestoneStatus.PENDING) {
+            throw new EscrowException(
+                    "Only PENDING milestones can be started. Current status: " + milestone.getStatus(),
+                    HttpStatus.BAD_REQUEST, "INVALID_MILESTONE_STATUS");
+        }
+
+        milestone.setStatus(MilestoneStatus.IN_PROGRESS);
+        milestone.setStartedAt(Instant.now());
+        milestoneRepository.save(milestone);
+
+        auditService.log("MILESTONE", milestoneId.toString(),
+                AuditAction.MILESTONE_STARTED, actor,
+                String.format("Work started on milestone '%s'", milestone.getTitle()));
+
+        return milestoneMapper.toResponse(milestone);
+    }
+
+    /**
+     * Student submits milestone deliverable for review.
+     */
+    @Transactional
+    public MilestoneResponse submitMilestone(UUID milestoneId, SubmitMilestoneRequest request, String actor) {
+        Milestone milestone = findMilestoneOrThrow(milestoneId);
+
+        if (milestone.getStatus() != MilestoneStatus.IN_PROGRESS && milestone.getStatus() != MilestoneStatus.PENDING) {
+            throw new EscrowException(
+                    "Only PENDING or IN_PROGRESS milestones can be submitted. Current status: " + milestone.getStatus(),
+                    HttpStatus.BAD_REQUEST, "INVALID_MILESTONE_STATUS");
+        }
+
+        milestone.setStatus(MilestoneStatus.SUBMITTED);
+        milestone.setSubmittedAt(Instant.now());
+        if (request != null) {
+            if (request.getDeliverableUrl() != null) milestone.setDeliverableUrl(request.getDeliverableUrl());
+            if (request.getSubmissionNotes() != null) milestone.setSubmissionNotes(request.getSubmissionNotes());
+        }
+        milestoneRepository.save(milestone);
+
+        auditService.log("MILESTONE", milestoneId.toString(),
+                AuditAction.MILESTONE_SUBMITTED, actor,
+                String.format("Milestone deliverable '%s' submitted for review.", milestone.getTitle()));
+
+        return milestoneMapper.toResponse(milestone);
+    }
+
+    /**
+     * Client requests changes/revisions on a submitted milestone.
+     */
+    @Transactional
+    public MilestoneResponse requestChanges(UUID milestoneId, RequestChangesRequest request, String actor) {
+        Milestone milestone = findMilestoneOrThrow(milestoneId);
+
+        if (milestone.getStatus() != MilestoneStatus.SUBMITTED) {
+            throw new EscrowException(
+                    "Only SUBMITTED milestones can have changes requested. Current status: " + milestone.getStatus(),
+                    HttpStatus.BAD_REQUEST, "INVALID_MILESTONE_STATUS");
+        }
+
+        milestone.setStatus(MilestoneStatus.IN_PROGRESS);
+        milestone.setReviewFeedback(request.getReviewFeedback());
+        milestone.setRevisionCount(milestone.getRevisionCount() != null ? milestone.getRevisionCount() + 1 : 1);
+        milestoneRepository.save(milestone);
+
+        auditService.log("MILESTONE", milestoneId.toString(),
+                AuditAction.MILESTONE_CHANGES_REQUESTED, actor,
+                String.format("Changes requested for milestone '%s': %s", milestone.getTitle(), request.getReviewFeedback()));
+
+        return milestoneMapper.toResponse(milestone);
+    }
+
+    /**
+     * Startup approves a milestone, preparing for payment release.
+     * Enforces sequential milestone release rules.
      */
     @Transactional
     public MilestoneResponse approveMilestone(UUID milestoneId, UUID approvedBy, String actor) {
@@ -133,7 +208,9 @@ public class MilestoneService {
                     HttpStatus.BAD_REQUEST, "INVALID_MILESTONE_STATUS");
         }
 
-        // Create idempotency key: milestoneId + approve to prevent double approval
+        // Validate sequential release: all earlier milestones must be released first
+        validateSequentialRelease(milestone);
+
         String idempotencyKey = "approve:" + milestoneId.toString();
 
         if (milestone.getStatus() != MilestoneStatus.FAILED && milestoneRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
@@ -155,13 +232,6 @@ public class MilestoneService {
 
     /**
      * Release payment for an approved milestone via the configured provider.
-     *
-     * This method:
-     * 1. Validates milestone is APPROVED (not already released)
-     * 2. Checks no pending/successful transaction exists (idempotency)
-     * 3. Creates provider order
-     * 4. Creates Transaction record
-     * 5. Updates milestone to PAYMENT_PROCESSING
      */
     @Transactional
     public MilestoneResponse releaseMilestone(UUID milestoneId, String actor) {
@@ -176,7 +246,7 @@ public class MilestoneService {
     public MilestoneResponse releaseMilestone(UUID milestoneId, String idempotencyKey, String actor) {
         Milestone milestone = findMilestoneOrThrow(milestoneId);
 
-        // Check idempotency key in transaction repository — if present and successful/pending, return existing state safely
+        // Check idempotency key in transaction repository
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             Optional<Transaction> existingTx = transactionRepository.findByIdempotencyKey(idempotencyKey);
             if (existingTx.isPresent()) {
@@ -186,7 +256,6 @@ public class MilestoneService {
                             idempotencyKey, milestoneId);
                     return milestoneMapper.toResponse(milestone);
                 }
-                // Previous attempt failed, allow retrying by giving a fresh idempotency key
                 idempotencyKey = idempotencyKey + ":retry:" + System.currentTimeMillis();
             }
         } else {
@@ -209,7 +278,10 @@ public class MilestoneService {
                     HttpStatus.BAD_REQUEST, "MILESTONE_NOT_APPROVED");
         }
 
-        // Check for existing successful transaction (idempotency at transaction level)
+        // Sequential release guard: ensure preceding milestones are already RELEASED
+        validateSequentialRelease(milestone);
+
+        // Check for existing successful transaction
         if (transactionRepository.existsByMilestoneIdAndStatus(milestoneId, TransactionStatus.SUCCESS)) {
             throw new DuplicateReleaseException(milestoneId.toString());
         }
@@ -225,15 +297,12 @@ public class MilestoneService {
                 .build();
 
         PaymentResult result = paymentService.createOrder(paymentRequest);
-
-        // Determine provider name dynamically
         String providerName = paymentService.getProviderName();
 
-        // Record the transaction
         Transaction transaction = Transaction.builder()
                 .milestone(milestone)
                 .providerOrderId(result.isSuccess() ? result.getOrderId() : null)
-            .approveUrl(result.isSuccess() ? result.getApproveUrl() : null)
+                .approveUrl(result.isSuccess() ? result.getApproveUrl() : null)
                 .amount(milestone.getAmount())
                 .currency(milestone.getContract().getCurrency())
                 .status(result.isSuccess() ? TransactionStatus.PENDING : TransactionStatus.FAILED)
@@ -269,6 +338,7 @@ public class MilestoneService {
                     .reason(result.getFailureReason())
                     .build());
         }
+
         MilestoneResponse response = milestoneMapper.toResponse(milestone);
         return MilestoneResponse.builder()
                 .id(response.getId())
@@ -283,6 +353,12 @@ public class MilestoneService {
                 .approvedAt(response.getApprovedAt())
                 .releasedAt(response.getReleasedAt())
                 .idempotencyKey(response.getIdempotencyKey())
+                .deliverableUrl(response.getDeliverableUrl())
+                .submissionNotes(response.getSubmissionNotes())
+                .reviewFeedback(response.getReviewFeedback())
+                .revisionCount(response.getRevisionCount())
+                .startedAt(response.getStartedAt())
+                .submittedAt(response.getSubmittedAt())
                 .transactionId(transaction.getId())
                 .providerOrderId(result.isSuccess() ? result.getOrderId() : null)
                 .approveUrl(result.isSuccess() ? result.getApproveUrl() : null)
@@ -292,8 +368,103 @@ public class MilestoneService {
     }
 
     /**
+     * Raise a dispute on a milestone.
+     */
+    @Transactional
+    public MilestoneResponse disputeMilestone(UUID milestoneId, DisputeMilestoneRequest request, String actor) {
+        Milestone milestone = findMilestoneOrThrow(milestoneId);
+
+        if (milestone.getStatus() == MilestoneStatus.RELEASED) {
+            throw new EscrowException("Released milestone cannot be disputed",
+                    HttpStatus.BAD_REQUEST, "MILESTONE_ALREADY_RELEASED");
+        }
+
+        milestone.setStatus(MilestoneStatus.DISPUTED);
+        milestone.setDisputeReason(request.getReason());
+        milestone.setDisputedAt(Instant.now());
+        milestoneRepository.save(milestone);
+
+        // Put contract in DISPUTED status as well
+        Contract contract = milestone.getContract();
+        contract.setStatus(ContractStatus.DISPUTED);
+        contractRepository.save(contract);
+
+        auditService.log("MILESTONE", milestoneId.toString(),
+                AuditAction.DISPUTE_RAISED, actor,
+                String.format("Milestone '%s' disputed: %s", milestone.getTitle(), request.getReason()));
+
+        return milestoneMapper.toResponse(milestone);
+    }
+
+    /**
+     * Resolve a disputed milestone (Admin action).
+     */
+    @Transactional
+    public MilestoneResponse resolveDispute(UUID milestoneId, ResolveDisputeRequest request, String actor) {
+        Milestone milestone = findMilestoneOrThrow(milestoneId);
+
+        if (milestone.getStatus() != MilestoneStatus.DISPUTED) {
+            throw new EscrowException("Only DISPUTED milestones can be resolved",
+                    HttpStatus.BAD_REQUEST, "MILESTONE_NOT_DISPUTED");
+        }
+
+        String resolution = request.getResolution().toUpperCase();
+        milestone.setDisputeResolvedAt(Instant.now());
+        milestone.setDisputeResolution(resolution);
+
+        switch (resolution) {
+            case "RELEASE" -> {
+                milestone.setStatus(MilestoneStatus.APPROVED);
+                milestoneRepository.save(milestone);
+                releaseMilestone(milestoneId, actor);
+            }
+            case "REFUND" -> {
+                milestone.setStatus(MilestoneStatus.FAILED);
+                milestoneRepository.save(milestone);
+            }
+            case "REOPEN" -> {
+                milestone.setStatus(MilestoneStatus.IN_PROGRESS);
+                milestoneRepository.save(milestone);
+            }
+            default -> throw new EscrowException("Invalid resolution: " + resolution + ". Supported: RELEASE, REFUND, REOPEN",
+                    HttpStatus.BAD_REQUEST, "INVALID_RESOLUTION");
+        }
+
+        // Restore contract status
+        Contract contract = milestone.getContract();
+        long unreleased = milestoneRepository.countUnreleasedByContractId(contract.getId());
+        contract.setStatus(unreleased == 0 ? ContractStatus.COMPLETED : ContractStatus.ACTIVE);
+        contractRepository.save(contract);
+
+        auditService.log("MILESTONE", milestoneId.toString(),
+                AuditAction.DISPUTE_RESOLVED, actor,
+                String.format("Milestone dispute resolved with action: %s. Notes: %s",
+                        resolution, request.getResolutionNotes()));
+
+        return milestoneMapper.toResponse(milestone);
+    }
+
+    /**
+     * Validates sequential milestone release: prior milestones must be RELEASED.
+     */
+    private void validateSequentialRelease(Milestone milestone) {
+        if (milestone.getSequenceOrder() != null && milestone.getSequenceOrder() > 1) {
+            List<Milestone> preceding = milestoneRepository.findPrecedingMilestones(
+                    milestone.getContract().getId(), milestone.getSequenceOrder());
+            for (Milestone m : preceding) {
+                if (m.getStatus() != MilestoneStatus.RELEASED) {
+                    throw new EscrowException(
+                            String.format("Milestone '%s' (Order %d) cannot be released/approved before preceding milestone '%s' (Order %d) is RELEASED. Preceding status: %s",
+                                    milestone.getTitle(), milestone.getSequenceOrder(),
+                                    m.getTitle(), m.getSequenceOrder(), m.getStatus()),
+                            HttpStatus.BAD_REQUEST, "SEQUENTIAL_RELEASE_VIOLATION");
+                }
+            }
+        }
+    }
+
+    /**
      * Called by WebhookProcessor after successful payment confirmation from the provider.
-     * Marks milestone as RELEASED and publishes payment.released event.
      */
     @Transactional
     public void confirmPaymentRelease(UUID milestoneId, String providerPaymentId,
@@ -357,4 +528,3 @@ public class MilestoneService {
                 .orElseThrow(() -> new ResourceNotFoundException("Milestone", milestoneId.toString()));
     }
 }
-
