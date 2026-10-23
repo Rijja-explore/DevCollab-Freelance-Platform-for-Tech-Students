@@ -1,7 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   User,
-  Star,
   Sparkles,
   Save,
   Plus,
@@ -9,6 +8,10 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { discoveryApi } from '../api/client'
+import { apiErrorMessage } from '../hooks/useApi'
+import { RatingBadge } from '../components/StarRating'
+import { AVAILABILITY_LABELS } from '../components/StudentProfileModal'
 import toast from 'react-hot-toast'
 
 export const Profile: React.FC = () => {
@@ -26,6 +29,33 @@ export const Profile: React.FC = () => {
   )
   const [newSkill, setNewSkill] = useState('')
   const [saving, setSaving] = useState(false)
+  const [location, setLocation] = useState('')
+  const [availability, setAvailability] = useState('AVAILABLE')
+  const [hourlyRate, setHourlyRate] = useState('')
+  const [rating, setRating] = useState<{ rating?: number; reviewCount?: number }>({})
+
+  const isStudent = role === 'STUDENT'
+  const studentProfileId = user?.profileId || user?.id
+
+  // Students have a searchable discovery profile — load the persisted values
+  useEffect(() => {
+    if (!isStudent || !studentProfileId) return
+    discoveryApi
+      .getStudentProfile(studentProfileId)
+      .then((res) => {
+        const p = res.data?.data
+        if (!p) return
+        if (p.fullName) setName(p.fullName)
+        if (p.headline) setHeadline(p.headline)
+        if (p.bio) setBio(p.bio)
+        if (Array.isArray(p.skills)) setSkills(p.skills)
+        setLocation(p.location || '')
+        setAvailability(p.availability || 'AVAILABLE')
+        setHourlyRate(p.hourlyRate != null ? String(p.hourlyRate) : '')
+        setRating({ rating: p.rating, reviewCount: p.reviewCount })
+      })
+      .catch(() => undefined)
+  }, [isStudent, studentProfileId])
 
   const handleAddSkill = () => {
     if (newSkill.trim() && !skills.includes(newSkill.trim())) {
@@ -38,19 +68,28 @@ export const Profile: React.FC = () => {
     setSkills(skills.filter((s) => s !== skillToRemove))
   }
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    setTimeout(() => {
-      updateProfileState({
-        name,
-        headline,
-        bio,
-        skills,
-      })
-      setSaving(false)
+    try {
+      if (isStudent && studentProfileId) {
+        await discoveryApi.updateStudentProfile(studentProfileId, {
+          fullName: name,
+          headline,
+          bio,
+          skills,
+          location: location.trim(),
+          availability,
+          hourlyRate: hourlyRate ? Number(hourlyRate) : undefined,
+        })
+      }
+      updateProfileState({ name, headline, bio, skills })
       toast.success('Profile details saved successfully')
-    }, 400)
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Could not save profile'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -84,9 +123,7 @@ export const Profile: React.FC = () => {
             </div>
             <p className="text-xs text-slate-400 mt-1">{user?.email || 'user@devcollab.local'}</p>
             <div className="flex items-center justify-center sm:justify-start gap-4 mt-2 text-xs text-slate-300">
-              <span className="flex items-center gap-1 text-amber-400">
-                <Star className="w-3.5 h-3.5 fill-amber-400" /> {user?.rating || 4.9} Rating
-              </span>
+              {isStudent && <RatingBadge rating={rating.rating} reviewCount={rating.reviewCount} />}
               <span className="flex items-center gap-1 text-sky-400">
                 <ShieldCheck className="w-3.5 h-3.5" /> Verified ID
               </span>
@@ -146,6 +183,45 @@ export const Profile: React.FC = () => {
               className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500 transition-all"
             />
           </div>
+
+          {isStudent && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Location</label>
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  maxLength={255}
+                  placeholder="e.g. Bengaluru, India or Remote"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Availability</label>
+                <select
+                  value={availability}
+                  onChange={(e) => setAvailability(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
+                >
+                  {Object.entries(AVAILABILITY_LABELS).map(([value, meta]) => (
+                    <option key={value} value={value}>{meta.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Hourly rate (USD)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={hourlyRate}
+                  onChange={(e) => setHourlyRate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500 transition-all"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Skill Matrix */}
           <div>

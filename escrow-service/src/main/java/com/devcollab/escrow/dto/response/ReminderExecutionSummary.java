@@ -13,6 +13,8 @@ public class ReminderExecutionSummary {
     private int pendingApprovalRemindersSent;
     private int pendingReleaseRemindersSent;
     private int totalRemindersSent;
+    /** Reminders that were actually delivered by email (the rest are visible in-app only). */
+    private int emailsSent;
     private Instant executedAt;
     private String message;
 }

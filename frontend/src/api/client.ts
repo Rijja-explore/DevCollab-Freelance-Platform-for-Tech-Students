@@ -46,6 +46,57 @@ export const authApi = {
 }
 
 // ─── Discovery & Matching Service API ─────────────────────────────────────────
+type QueryValue = string | number | boolean | undefined | null | Array<string | number>
+
+/** Builds a query string, skipping empty values and repeating array params. */
+const toQuery = (params: Record<string, QueryValue>) => {
+  const qs = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return
+    if (Array.isArray(value)) value.forEach((v) => qs.append(key, String(v)))
+    else qs.append(key, String(value))
+  })
+  return qs.toString()
+}
+
+export interface ProjectSearchParams {
+  q?: string
+  category?: string
+  status?: string
+  skills?: string[]
+  allSkills?: boolean
+  minBudget?: number
+  maxBudget?: number
+  page?: number
+  size?: number
+  sortBy?: 'createdAt' | 'budget' | 'title'
+  sortDirection?: 'asc' | 'desc'
+}
+
+export interface TalentSearchParams {
+  q?: string
+  skills?: string[]
+  allSkills?: boolean
+  minRating?: number
+  minHourlyRate?: number
+  maxHourlyRate?: number
+  location?: string
+  availability?: string[]
+  page?: number
+  size?: number
+  sortBy?: 'rating' | 'reviewCount' | 'hourlyRate' | 'fullName'
+  sortDirection?: 'asc' | 'desc'
+}
+
+export interface CreateReviewPayload {
+  reviewerId: string
+  reviewerName: string
+  rating: number
+  title?: string
+  comment?: string
+  projectId?: string
+}
+
 export const discoveryApi = {
   getProjects: (category?: string, status?: string, page = 0, size = 20) => {
     const params = new URLSearchParams({ page: String(page), size: String(size) })
@@ -92,6 +143,36 @@ export const discoveryApi = {
     client.get(`/api/matches/startup/${startupId}`),
   getStudentProfiles: () =>
     client.get('/api/profiles/students'),
+  getStudentProfile: (id: string) =>
+    client.get(`/api/profiles/students/${id}`),
+  updateStudentProfile: (id: string, data: unknown) =>
+    client.put(`/api/profiles/students/${id}`, data),
+
+  // ── Advanced search & filtering ────────────────────────────────────────────
+  advancedSearchProjects: (params: ProjectSearchParams) =>
+    client.get(`/api/projects/advanced-search?${toQuery({ ...params })}`),
+  advancedSearchTalent: (params: TalentSearchParams) =>
+    client.get(`/api/profiles/students/advanced-search?${toQuery({ ...params })}`),
+
+  // ── Ratings & reviews ──────────────────────────────────────────────────────
+  getReviews: (studentId: string, page = 0, size = 10) =>
+    client.get(`/api/profiles/students/${studentId}/reviews?page=${page}&size=${size}`),
+  getReviewSummary: (studentId: string) =>
+    client.get(`/api/profiles/students/${studentId}/reviews/summary`),
+  addReview: (studentId: string, data: CreateReviewPayload) =>
+    client.post(`/api/profiles/students/${studentId}/reviews`, data),
+  deleteReview: (reviewId: string) =>
+    client.delete(`/api/profiles/students/reviews/${reviewId}`),
+
+  // ── Recommendation engine ──────────────────────────────────────────────────
+  getSimilarProjects: (projectId: string, limit = 6) =>
+    client.get(`/api/recommendations/projects/${projectId}/similar?limit=${limit}`),
+  getCandidatesForProject: (projectId: string, limit = 10) =>
+    client.get(`/api/recommendations/projects/${projectId}/candidates?limit=${limit}`),
+  getSimilarStudents: (studentId: string, limit = 6) =>
+    client.get(`/api/recommendations/students/${studentId}/similar?limit=${limit}`),
+  getStudentsFromViews: (viewedIds: string[], limit = 6) =>
+    client.get(`/api/recommendations/students/from-views?${toQuery({ ids: viewedIds, limit })}`),
   graphql: (query: string, variables: Record<string, unknown> = {}) =>
     client.post('/graphql', { query, variables }),
   analyzeMySkillGap: (projectId: string) =>
@@ -233,8 +314,8 @@ export const contractsApi = {
 export const milestonesApi = {
   getById: (id: string) =>
     client.get(`/api/milestones/${id}`),
-  getAll: (page = 0, size = 20) =>
-    client.get(`/api/milestones?page=${page}&size=${size}`),
+  getAll: (page = 0, size = 20, contractId?: string | null, status?: string) =>
+    client.get(`/api/milestones?${toQuery({ page, size, contractId, status })}`),
   create: (data: unknown) =>
     client.post('/api/milestones', data),
   update: (id: string, data: unknown) =>
@@ -245,6 +326,27 @@ export const milestonesApi = {
     client.post(`/api/milestones/${id}/release`),
   complete: (id: string) =>
     client.post(`/api/milestones/${id}/complete`),
+  start: (id: string) =>
+    client.post(`/api/milestones/${id}/start`),
+  submit: (id: string, data: { deliverableUrl?: string; submissionNotes?: string }) =>
+    client.post(`/api/milestones/${id}/submit`, data),
+  requestChanges: (id: string, reviewFeedback: string) =>
+    client.post(`/api/milestones/${id}/request-changes`, { reviewFeedback }),
+  dispute: (id: string, reason: string) =>
+    client.post(`/api/milestones/${id}/dispute`, { reason }),
+  resolveDispute: (id: string, resolution: 'RELEASE' | 'REFUND' | 'REOPEN', resolutionNotes?: string) =>
+    client.post(`/api/milestones/${id}/resolve-dispute`, { resolution, resolutionNotes }),
+}
+
+export const remindersApi = {
+  getAll: (page = 0, size = 20) =>
+    client.get(`/api/reminders?page=${page}&size=${size}`),
+  getByContract: (contractId: string) =>
+    client.get(`/api/reminders/contract/${contractId}`),
+  getByMilestone: (milestoneId: string) =>
+    client.get(`/api/reminders/milestone/${milestoneId}`),
+  trigger: () =>
+    client.post('/api/reminders/trigger'),
 }
 
 export const transactionsApi = {

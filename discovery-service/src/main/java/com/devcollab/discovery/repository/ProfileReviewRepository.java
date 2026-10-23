@@ -22,6 +22,10 @@ public interface ProfileReviewRepository extends JpaRepository<ProfileReview, St
 
     Optional<ProfileReview> findByStudentIdAndProjectId(String studentId, String projectId);
 
+    boolean existsByStudentIdAndReviewerIdAndProjectId(String studentId, String reviewerId, String projectId);
+
+    boolean existsByStudentIdAndReviewerIdAndProjectIdIsNull(String studentId, String reviewerId);
+
     @Query("SELECT AVG(r.rating) FROM ProfileReview r WHERE r.studentId = :studentId")
     Double getAverageRating(@Param("studentId") String studentId);
 

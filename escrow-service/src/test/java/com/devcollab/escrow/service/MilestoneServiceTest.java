@@ -271,8 +271,9 @@ class MilestoneServiceTest {
 
         assertThatThrownBy(() -> milestoneService.approveMilestone(milestone2.getId(), UUID.randomUUID(), "startup@test.com"))
                 .isInstanceOf(EscrowException.class)
-                .hasMessageContaining("SEQUENTIAL_RELEASE_VIOLATION")
-                .hasMessageContaining("cannot be released/approved before preceding milestone");
+                .hasMessageContaining("cannot be released/approved before preceding milestone")
+                .extracting(ex -> ((EscrowException) ex).getErrorCode())
+                .isEqualTo("SEQUENTIAL_RELEASE_VIOLATION");
     }
 
     @Test

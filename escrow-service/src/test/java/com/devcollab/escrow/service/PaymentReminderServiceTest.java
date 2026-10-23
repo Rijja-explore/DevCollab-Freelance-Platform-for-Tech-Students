@@ -35,6 +35,7 @@ class PaymentReminderServiceTest {
     @Mock private MilestoneRepository milestoneRepository;
     @Mock private PaymentReminderRepository paymentReminderRepository;
     @Mock private AuditService auditService;
+    @Mock private ReminderEmailService reminderEmailService;
 
     @InjectMocks
     private PaymentReminderService paymentReminderService;
@@ -102,7 +103,7 @@ class PaymentReminderServiceTest {
                 .willReturn(List.of());
         given(milestoneRepository.findPendingApprovalMilestones(any(Instant.class)))
                 .willReturn(List.of());
-        given(milestoneRepository.findPendingReleaseMilestones(any(Instant.class)))
+        given(milestoneRepository.findPendingReleaseMilestones(any(), any(Instant.class)))
                 .willReturn(List.of());
 
         given(paymentReminderRepository.existsRecentReminder(eq(overdueMilestone.getId()), eq(ReminderType.OVERDUE_MILESTONE), any(Instant.class)))
@@ -125,7 +126,7 @@ class PaymentReminderServiceTest {
                 .willReturn(List.of(upcomingMilestone));
         given(milestoneRepository.findPendingApprovalMilestones(any(Instant.class)))
                 .willReturn(List.of());
-        given(milestoneRepository.findPendingReleaseMilestones(any(Instant.class)))
+        given(milestoneRepository.findPendingReleaseMilestones(any(), any(Instant.class)))
                 .willReturn(List.of());
 
         given(paymentReminderRepository.existsRecentReminder(eq(upcomingMilestone.getId()), eq(ReminderType.UPCOMING_DUE_DATE), any(Instant.class)))
@@ -147,7 +148,7 @@ class PaymentReminderServiceTest {
                 .willReturn(List.of());
         given(milestoneRepository.findPendingApprovalMilestones(any(Instant.class)))
                 .willReturn(List.of());
-        given(milestoneRepository.findPendingReleaseMilestones(any(Instant.class)))
+        given(milestoneRepository.findPendingReleaseMilestones(any(), any(Instant.class)))
                 .willReturn(List.of());
 
         // Already sent in last 24h
@@ -159,5 +160,27 @@ class PaymentReminderServiceTest {
         assertThat(summary.getOverdueRemindersSent()).isEqualTo(0);
         assertThat(summary.getTotalRemindersSent()).isEqualTo(0);
     }
-}
 
+    @Test
+    @DisplayName("Should email the student and record SENT when a recipient email is known")
+    void processAllReminders_ShouldEmailKnownRecipient() {
+        contract.setStudentEmail("student@devcollab.local");
+        given(milestoneRepository.findOverdueMilestones(any(), any(LocalDate.class))).willReturn(List.of(overdueMilestone));
+        given(milestoneRepository.findUpcomingMilestones(any(), any(LocalDate.class), any(LocalDate.class))).willReturn(List.of());
+        given(milestoneRepository.findPendingApprovalMilestones(any(Instant.class))).willReturn(List.of());
+        given(milestoneRepository.findPendingReleaseMilestones(any(), any(Instant.class))).willReturn(List.of());
+        given(paymentReminderRepository.existsRecentReminder(any(), any(), any())).willReturn(false);
+        given(reminderEmailService.send(org.mockito.ArgumentMatchers.eq("student@devcollab.local"), any(), any()))
+                .willReturn(ReminderEmailService.DeliveryStatus.SENT);
+
+        ReminderExecutionSummary summary = paymentReminderService.processAllReminders();
+
+        assertThat(summary.getOverdueRemindersSent()).isEqualTo(1);
+        assertThat(summary.getEmailsSent()).isEqualTo(1);
+        org.mockito.ArgumentCaptor<com.devcollab.escrow.entity.PaymentReminder> captor =
+                org.mockito.ArgumentCaptor.forClass(com.devcollab.escrow.entity.PaymentReminder.class);
+        org.mockito.Mockito.verify(paymentReminderRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo("SENT");
+        assertThat(captor.getValue().getRecipientEmail()).isEqualTo("student@devcollab.local");
+    }
+}

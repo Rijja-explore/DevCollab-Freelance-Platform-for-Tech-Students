@@ -60,6 +60,22 @@ public class RecommendationController {
     }
 
     /**
+     * "Freelancers similar to those you viewed" — ids are the viewer's recently viewed
+     * student profiles, most recent first (e.g. ?ids=a&ids=b or ?ids=a,b).
+     */
+    @GetMapping("/students/from-views")
+    public ResponseEntity<Map<String, Object>> getStudentsSimilarToViewed(
+            @RequestParam(required = false) List<String> ids,
+            @RequestParam(defaultValue = "6") int limit) {
+        List<MatchingService.SimilarStudentRecommendation> similar = matchingService.getStudentsSimilarToViewed(ids, limit);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("data", similar);
+        response.put("count", similar.size());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Get similar students to a given student
      */
     @GetMapping("/students/{studentId}/similar")

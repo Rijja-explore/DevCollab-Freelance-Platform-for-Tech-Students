@@ -1,6 +1,20 @@
 import { useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
 
+/**
+ * Extracts a readable message from an API error. Escrow returns
+ * { error: { message } }; discovery returns { error: "text", message: "text" }.
+ */
+export function apiErrorMessage(err: any, fallback = 'An unexpected error occurred'): string {
+  const body = err?.response?.data;
+  if (body) {
+    if (typeof body.error === 'object' && body.error?.message) return body.error.message;
+    if (typeof body.error === 'string' && body.error) return body.error;
+    if (typeof body.message === 'string' && body.message) return body.message;
+  }
+  return err?.message ?? fallback;
+}
+
 interface UseApiOptions<T> {
   onSuccess?: (data: T) => void;
   onError?: (error: any) => void;
@@ -31,10 +45,7 @@ export function useApi<T, Args extends any[]>(
         }
         return resultData;
       } catch (err: any) {
-        const errMsg =
-          err.response?.data?.error?.message ??
-          err.message ??
-          'An unexpected error occurred';
+        const errMsg = apiErrorMessage(err);
         setError(errMsg);
         toast.error(errMsg);
         if (options.onError) {

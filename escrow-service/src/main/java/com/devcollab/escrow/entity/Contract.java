@@ -68,6 +68,12 @@ public class Contract {
     @Column(name = "terms", columnDefinition = "TEXT")
     private String terms;
 
+    @Column(name = "startup_email", length = 255)
+    private String startupEmail;
+
+    @Column(name = "student_email", length = 255)
+    private String studentEmail;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false, nullable = false)
     private Instant createdAt;

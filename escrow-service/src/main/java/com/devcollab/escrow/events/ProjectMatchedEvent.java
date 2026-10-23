@@ -57,6 +57,14 @@ public class ProjectMatchedEvent extends BaseEvent {
 
         @JsonProperty("milestones")
         private List<MilestoneDefinition> milestones;
+
+        @JsonProperty("startup_email")
+        @JsonAlias("startupEmail")
+        private String startupEmail;
+
+        @JsonProperty("student_email")
+        @JsonAlias("studentEmail")
+        private String studentEmail;
     }
 
     @Getter

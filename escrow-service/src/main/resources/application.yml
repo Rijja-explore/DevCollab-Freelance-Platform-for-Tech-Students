@@ -47,7 +47,7 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
-    validate-on-migrate: true
+    validate-on-migrate: ${FLYWAY_VALIDATE_ON_MIGRATE:false}
 
   # ─────────────────────────────────────────────────────────
   #  RabbitMQ
@@ -129,6 +129,12 @@ escrow:
     milestone-completed: milestone.completed
     payment-released: payment.released
     payment-failed: payment.failed
+  reminders:
+    cron: ${REMINDERS_CRON:0 0 9 * * *}
+    email:
+      # Emails are sent only when an SMTP host is configured (SPRING_MAIL_HOST).
+      enabled: ${REMINDER_EMAILS_ENABLED:true}
+      from: ${REMINDER_EMAIL_FROM:DevCollab Escrow <no-reply@devcollab.local>}
   dlx:
     exchange: devcollab.events.dlx
     queue: q.dead.letter
@@ -147,6 +153,9 @@ management:
   health:
     rabbitmq:
       enabled: true
+    mail:
+      # Reminder mail is best-effort; an SMTP outage must not mark the service unhealthy
+      enabled: false
 
 # ─────────────────────────────────────────────────────────
 #  SpringDoc / Swagger UI

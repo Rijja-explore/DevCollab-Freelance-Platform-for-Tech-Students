@@ -18,6 +18,10 @@ export default defineConfig({
         target: 'http://localhost:8081',
         changeOrigin: true,
       },
+      '/api/recommendations': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
       '/api/auth': {
         target: 'http://localhost:8081',
         changeOrigin: true,

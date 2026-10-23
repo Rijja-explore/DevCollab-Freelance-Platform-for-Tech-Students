@@ -39,13 +39,22 @@ public class StudentProfile {
     @Builder.Default
     private BigDecimal hourlyRate = BigDecimal.valueOf(35.00);
 
+    /** Aggregate of profile_reviews (0.0 until the first review is left). */
     @Column(name = "rating")
     @Builder.Default
-    private Double rating = 4.8;
+    private Double rating = 0.0;
 
     @Column(name = "review_count")
     @Builder.Default
     private Integer reviewCount = 0;
+
+    @Column(name = "location", length = 255)
+    private String location;
+
+    /** AVAILABLE, PART_TIME or UNAVAILABLE. */
+    @Column(name = "availability", length = 30)
+    @Builder.Default
+    private String availability = "AVAILABLE";
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "student_skills", joinColumns = @JoinColumn(name = "student_id"))
@@ -63,7 +72,10 @@ public class StudentProfile {
             this.id = UUID.randomUUID().toString();
         }
         if (this.rating == null) {
-            this.rating = 4.8;
+            this.rating = 0.0;
+        }
+        if (this.availability == null || this.availability.isBlank()) {
+            this.availability = "AVAILABLE";
         }
         if (this.reviewCount == null) {
             this.reviewCount = 0;

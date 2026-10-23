@@ -62,6 +62,10 @@ public interface MilestoneRepository extends JpaRepository<Milestone, UUID> {
     @Query("SELECT m FROM Milestone m WHERE m.status = 'SUBMITTED' AND m.submittedAt < :cutoff")
     List<Milestone> findPendingApprovalMilestones(@Param("cutoff") Instant cutoff);
 
-    @Query("SELECT m FROM Milestone m WHERE m.status = 'APPROVED' AND m.approvedAt < :cutoff")
-    List<Milestone> findPendingReleaseMilestones(@Param("cutoff") Instant cutoff);
+    @Query("SELECT m FROM Milestone m WHERE m.status IN :statuses AND m.approvedAt < :cutoff")
+    List<Milestone> findPendingReleaseMilestones(
+            @Param("statuses") Collection<MilestoneStatus> statuses,
+            @Param("cutoff") Instant cutoff);
+
+    Page<Milestone> findByContract_IdAndStatus(UUID contractId, MilestoneStatus status, Pageable pageable);
 }

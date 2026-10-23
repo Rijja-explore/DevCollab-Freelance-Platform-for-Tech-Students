@@ -47,7 +47,7 @@ public class MatchingService {
                 ? student.getSkills().stream().map(String::toLowerCase).collect(Collectors.toSet())
                 : Set.of("react", "node.js", "java", "python", "typescript");
 
-        double rating = (student != null && student.getRating() != null) ? student.getRating() : 4.5;
+        double rating = effectiveRating(student);
 
         List<Project> openProjects = projectRepository.findByStatus(ProjectStatus.OPEN);
 
@@ -110,7 +110,7 @@ public class MatchingService {
             missing.removeAll(studentSkills);
 
             double skillRatio = projectSkills.isEmpty() ? 0.5 : ((double) matching.size() / projectSkills.size());
-            double studentRating = student.getRating() != null ? student.getRating() : 4.0;
+            double studentRating = effectiveRating(student);
             double ratingRatio = Math.min(1.0, studentRating / 5.0);
 
             // Rate fit: assume ~25 hour initial milestone
@@ -125,11 +125,13 @@ public class MatchingService {
             double composite = ((skillRatio * 0.55) + (ratingRatio * 0.25) + (budgetFit * 0.20)) * 100.0 + reviewBonus;
             double finalScore = BigDecimal.valueOf(Math.min(100.0, composite)).setScale(1, RoundingMode.HALF_UP).doubleValue();
 
-            String fitReason = String.format("%.0f%% skills match (%s), %.1f★ rating (%d reviews), hourly rate $%.2f",
+            String ratingText = reviewCount > 0
+                    ? String.format("%.1f★ rating (%d review%s)", studentRating, reviewCount, reviewCount == 1 ? "" : "s")
+                    : "no reviews yet";
+            String fitReason = String.format("%.0f%% skills match (%s), %s, hourly rate $%.2f",
                     skillRatio * 100.0,
                     matching.isEmpty() ? "entry profile" : String.join(", ", matching),
-                    studentRating,
-                    reviewCount,
+                    ratingText,
                     studentHourlyRate);
 
             candidates.add(CandidateRecommendation.builder()
@@ -252,6 +254,99 @@ public class MatchingService {
         return similar.stream().limit(Math.max(1, limit)).collect(Collectors.toList());
     }
 
+    /**
+     * Content-based "freelancers similar to those you viewed": builds a weighted skill
+     * profile from the viewed students (more recent views weigh more) and ranks every
+     * other student by weighted skill overlap, hourly-rate proximity and reputation.
+     *
+     * @param viewedIds student profile/user ids, most recent first
+     */
+    @Transactional(readOnly = true)
+    public List<SimilarStudentRecommendation> getStudentsSimilarToViewed(List<String> viewedIds, int limit) {
+        if (viewedIds == null || viewedIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<StudentProfile> viewed = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (String id : viewedIds) {
+            if (id == null || id.isBlank()) continue;
+            studentProfileRepository.findById(id.trim())
+                    .or(() -> studentProfileRepository.findByUserId(id.trim()))
+                    .filter(p -> seen.add(p.getId()))
+                    .ifPresent(viewed::add);
+            if (viewed.size() >= 20) break;
+        }
+        if (viewed.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, Double> skillWeights = new HashMap<>();
+        double rateSum = 0.0;
+        for (int i = 0; i < viewed.size(); i++) {
+            double recency = 1.0 / (1.0 + i * 0.5);
+            StudentProfile v = viewed.get(i);
+            if (v.getSkills() != null) {
+                for (String skill : v.getSkills()) {
+                    skillWeights.merge(skill.toLowerCase(), recency, Double::sum);
+                }
+            }
+            rateSum += v.getHourlyRate() != null ? v.getHourlyRate().doubleValue() : 35.0;
+        }
+        double avgRate = rateSum / viewed.size();
+        double totalWeight = skillWeights.values().stream().mapToDouble(Double::doubleValue).sum();
+
+        List<SimilarStudentRecommendation> results = new ArrayList<>();
+        for (StudentProfile s : studentProfileRepository.findAll()) {
+            if (seen.contains(s.getId())) {
+                continue;
+            }
+            Set<String> sSkills = s.getSkills() != null
+                    ? s.getSkills().stream().map(String::toLowerCase).collect(Collectors.toSet())
+                    : Collections.emptySet();
+
+            double overlap = 0.0;
+            List<String> shared = new ArrayList<>();
+            for (String skill : sSkills) {
+                Double w = skillWeights.get(skill);
+                if (w != null) {
+                    overlap += w;
+                    shared.add(skill);
+                }
+            }
+            if (shared.isEmpty()) {
+                continue;
+            }
+            double skillScore = totalWeight > 0 ? overlap / totalWeight : 0.0;
+            double sRate = s.getHourlyRate() != null ? s.getHourlyRate().doubleValue() : 35.0;
+            double rateProximity = Math.max(0.0, 1.0 - (Math.abs(avgRate - sRate) / 50.0));
+            double reputation = effectiveRating(s) / 5.0;
+
+            double score = ((skillScore * 0.65) + (rateProximity * 0.15) + (reputation * 0.20)) * 100.0;
+            results.add(SimilarStudentRecommendation.builder()
+                    .student(s)
+                    .similarityScore(BigDecimal.valueOf(Math.min(100.0, score)).setScale(1, RoundingMode.HALF_UP).doubleValue())
+                    .sharedSkills(shared)
+                    .build());
+        }
+
+        results.sort(Comparator.comparingDouble(SimilarStudentRecommendation::getSimilarityScore).reversed());
+        return results.stream().limit(Math.max(1, Math.min(50, limit))).collect(Collectors.toList());
+    }
+
+    /**
+     * Unreviewed students get a neutral 3.5 instead of 0 so that new students are not
+     * ranked below everyone else purely for lacking reviews.
+     */
+    private static double effectiveRating(StudentProfile student) {
+        if (student == null || student.getReviewCount() == null || student.getReviewCount() == 0
+                || student.getRating() == null || student.getRating() <= 0) {
+            return 3.5;
+        }
+        return student.getRating();
+    }
+
+    @CacheEvict(value = "recommendations", allEntries = true)
     @Transactional
     public MatchResult applyForProject(String projectId, String studentId) {
         log.info("Student {} applying for project {}", studentId, projectId);
@@ -280,7 +375,6 @@ public class MatchingService {
                     p.setUserId(studentId);
                     p.setFullName("Student Developer");
                     p.setHeadline("Computer Science Student");
-                    p.setRating(4.9);
                     p.setSkills(new HashSet<>(List.of("react", "node.js", "typescript", "spring boot", "postgresql")));
                     return studentProfileRepository.save(p);
                 });
@@ -299,7 +393,7 @@ public class MatchingService {
         double skillRatio = projectSkills.isEmpty() ? 0.0 : ((double) matching.size() / projectSkills.size());
         
         // Normalize to 0-100 scale: 70% skill match + 30% rating
-        double studentRating = (student.getRating() != null) ? student.getRating() : 0.0;
+        double studentRating = effectiveRating(student);
         double ratingComponent = (studentRating / 5.0) * 0.30;
         double skillComponent = skillRatio * 0.70;
         double weightedScore = (skillComponent + ratingComponent) * 100;
@@ -329,10 +423,9 @@ public class MatchingService {
                     return matchRecordRepository.save(newMatch);
                 });
 
-        // Publish event to RabbitMQ for Escrow & Workspace services
-        eventPublisher.publishProjectMatched(project, studentId);
-
-        log.info("Evicting cached recommendations for student: {}", studentId);
+        // project.matched is published only when the startup approves the application
+        // (see approveMatch). Publishing here created the contract/workspace for whichever
+        // student applied first, before any approval.
         log.info("Application recorded for project {} and student {} with status PENDING", projectId, studentId);
 
         return MatchResult.builder()
@@ -347,6 +440,7 @@ public class MatchingService {
                 .build();
     }
 
+    @CacheEvict(value = {"recommendations", "projects"}, allEntries = true)
     @Transactional
     public MatchResult approveMatch(String matchId, String startupId) {
         log.info("Startup {} approving match {}", startupId, matchId);
@@ -356,6 +450,13 @@ public class MatchingService {
 
         Project project = projectRepository.findById(match.getProjectId())
                 .orElseThrow(() -> new IllegalArgumentException("Project not found: " + match.getProjectId()));
+
+        if ("ACCEPTED".equalsIgnoreCase(match.getStatus())) {
+            throw new IllegalStateException("This application has already been approved.");
+        }
+        if (project.getStatus() != ProjectStatus.OPEN) {
+            throw new IllegalStateException("This project has already been matched with another student.");
+        }
 
         // Mark this match as ACCEPTED
         match.setStatus("ACCEPTED");
@@ -400,6 +501,7 @@ public class MatchingService {
                 .build();
     }
 
+    @CacheEvict(value = "recommendations", allEntries = true)
     @Transactional
     public MatchResult rejectMatch(String matchId, String startupId) {
         log.info("Startup {} rejecting match {}", startupId, matchId);

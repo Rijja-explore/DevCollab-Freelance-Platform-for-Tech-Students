@@ -37,11 +37,26 @@ public class ProfileReviewService {
                 .or(() -> studentProfileRepository.findByUserId(studentId))
                 .orElseThrow(() -> new IllegalArgumentException("Student profile not found: " + studentId));
 
+        String reviewerId = dto.getReviewerId().trim();
+        if (reviewerId.equals(student.getId()) || reviewerId.equals(student.getUserId())) {
+            throw new IllegalArgumentException("You cannot review your own profile");
+        }
+
+        String projectId = (dto.getProjectId() != null && !dto.getProjectId().isBlank()) ? dto.getProjectId().trim() : null;
+        boolean duplicate = projectId == null
+                ? profileReviewRepository.existsByStudentIdAndReviewerIdAndProjectIdIsNull(student.getId(), reviewerId)
+                : profileReviewRepository.existsByStudentIdAndReviewerIdAndProjectId(student.getId(), reviewerId, projectId);
+        if (duplicate) {
+            throw new IllegalStateException(projectId == null
+                    ? "You have already reviewed this student"
+                    : "You have already reviewed this student for this project");
+        }
+
         ProfileReview review = ProfileReview.builder()
                 .studentId(student.getId())
-                .reviewerId(dto.getReviewerId())
-                .reviewerName(dto.getReviewerName())
-                .projectId(dto.getProjectId())
+                .reviewerId(reviewerId)
+                .reviewerName(dto.getReviewerName().trim())
+                .projectId(projectId)
                 .rating(dto.getRating())
                 .title(dto.getTitle())
                 .comment(dto.getComment())
@@ -57,20 +72,17 @@ public class ProfileReviewService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProfileReview> getReviewsForStudent(String studentId, int page, int size) {
-        String resolvedStudentId = studentProfileRepository.findByUserId(studentId)
-                .map(StudentProfile::getId)
-                .orElse(studentId);
+        String resolvedStudentId = resolveStudentId(studentId);
 
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        PageRequest pageRequest = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)),
+                Sort.by("createdAt").descending());
         Page<ProfileReview> reviewPage = profileReviewRepository.findByStudentId(resolvedStudentId, pageRequest);
         return PageResponse.from(reviewPage);
     }
 
     @Transactional(readOnly = true)
     public ReviewSummaryDto getReviewSummary(String studentId) {
-        String resolvedStudentId = studentProfileRepository.findByUserId(studentId)
-                .map(StudentProfile::getId)
-                .orElse(studentId);
+        String resolvedStudentId = resolveStudentId(studentId);
 
         Double avg = profileReviewRepository.getAverageRating(resolvedStudentId);
         Long count = profileReviewRepository.countByStudentId(resolvedStudentId);
@@ -108,6 +120,14 @@ public class ProfileReviewService {
         String studentId = review.getStudentId();
         profileReviewRepository.delete(review);
         recalculateStudentRating(studentId);
+    }
+
+    /** Accepts either the profile id or the owning user id. */
+    private String resolveStudentId(String studentId) {
+        return studentProfileRepository.findById(studentId)
+                .or(() -> studentProfileRepository.findByUserId(studentId))
+                .map(StudentProfile::getId)
+                .orElseThrow(() -> new IllegalArgumentException("Student profile not found: " + studentId));
     }
 
     private void recalculateStudentRating(String studentId) {

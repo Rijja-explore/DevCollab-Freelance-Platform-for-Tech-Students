@@ -60,7 +60,7 @@ public class ProjectService {
         return projectRepository.findById(id);
     }
 
-    @CacheEvict(value = "projects", allEntries = true)
+    @CacheEvict(value = {"projects", "recommendations"}, allEntries = true)
     @Transactional
     public Project createProject(String startupId, String title, String description,
                                  String category, BigDecimal budget, String currency,
@@ -116,18 +116,10 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public PageResponse<Project> searchProjectsAdvanced(ProjectSearchCriteria criteria) {
-        String sortBy = criteria.getSortBy();
-        if (sortBy == null || sortBy.isBlank()) {
-            sortBy = "createdAt";
-        }
-        Sort.Direction direction = "asc".equalsIgnoreCase(criteria.getSortDirection())
-                ? Sort.Direction.ASC
-                : Sort.Direction.DESC;
-
         PageRequest pageRequest = PageRequest.of(
                 Math.max(0, criteria.getPage()),
-                Math.max(1, criteria.getSize()),
-                Sort.by(direction, sortBy)
+                Math.min(100, Math.max(1, criteria.getSize())),
+                ProjectSpecification.sort(criteria)
         );
 
         Specification<Project> spec = ProjectSpecification.build(criteria);
@@ -245,7 +237,7 @@ public class ProjectService {
         return uniqueResults;
     }
 
-    @CacheEvict(value = "projects", allEntries = true)
+    @CacheEvict(value = {"projects", "recommendations"}, allEntries = true)
     @Transactional
     public Project updateStatus(String id, ProjectStatus status) {
         Project project = projectRepository.findById(id)
@@ -263,7 +255,7 @@ public class ProjectService {
         return updated;
     }
 
-    @CacheEvict(value = "projects", allEntries = true)
+    @CacheEvict(value = {"projects", "recommendations"}, allEntries = true)
     @Transactional
     public Project updateProject(String id, String title, String description,
                                  String category, BigDecimal budget, String currency,
@@ -307,7 +299,7 @@ public class ProjectService {
         return updated;
     }
 
-    @CacheEvict(value = "projects", allEntries = true)
+    @CacheEvict(value = {"projects", "recommendations"}, allEntries = true)
     @Transactional
     public void deleteProject(String id) {
         Project project = projectRepository.findById(id)

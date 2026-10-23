@@ -146,6 +146,11 @@ public class EndToEndFlowTest {
         return new UsernamePasswordAuthenticationToken(p, null, p.getAuthorities());
     }
 
+    private UsernamePasswordAuthenticationToken studentAuth() {
+        UserPrincipal p = new UserPrincipal(UUID.randomUUID(), "student@e2e.test", List.of("STUDENT"));
+        return new UsernamePasswordAuthenticationToken(p, null, p.getAuthorities());
+    }
+
     private UsernamePasswordAuthenticationToken adminAuth() {
         UserPrincipal p = new UserPrincipal(UUID.randomUUID(), "admin@e2e.test", List.of("ADMIN"));
         return new UsernamePasswordAuthenticationToken(p, null, p.getAuthorities());
@@ -252,45 +257,54 @@ public class EndToEndFlowTest {
 
     @Test
     @Order(5)
-    @DisplayName("Flow B-2: approveMilestone (service layer) → APPROVED")
-    void flowB2_approveMilestone_becomesApproved() {
-        milestoneService.approveMilestone(sharedMilestoneId, sharedStartupId, "e2e:test");
+    @DisplayName("Flow B-2: student starts + submits, startup approves → payment released automatically (PAYMENT_PROCESSING)")
+    void flowB2_approveMilestone_autoReleasesPayment() throws Exception {
+        // Approving before the deliverable is submitted is rejected
+        mockMvc.perform(post("/api/milestones/" + sharedMilestoneId + "/approve")
+                        .with(authentication(startupAuth())))
+                .andExpect(status().isBadRequest());
 
-        Milestone m = milestoneRepository.findById(sharedMilestoneId).orElseThrow();
-        assertThat(m.getStatus()).isEqualTo(MilestoneStatus.APPROVED);
-        assertThat(m.getApprovedBy()).isEqualTo(sharedStartupId);
-    }
-
-    @Test
-    @Order(6)
-    @DisplayName("Flow B-3: POST /api/milestones/{id}/release → PAYMENT_PROCESSING (mock provider)")
-    void flowB3_releaseMilestone_initatesPaymentProcessing() throws Exception {
-        String idempotencyKey = "e2e-release-" + sharedMilestoneId;
-
-        mockMvc.perform(post("/api/milestones/" + sharedMilestoneId + "/release")
-                        .with(authentication(startupAuth()))
-                        .header("Idempotency-Key", idempotencyKey))
+        mockMvc.perform(post("/api/milestones/" + sharedMilestoneId + "/start")
+                        .with(authentication(studentAuth())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("PAYMENT_PROCESSING"));
+                .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
+
+        mockMvc.perform(post("/api/milestones/" + sharedMilestoneId + "/submit")
+                        .with(authentication(studentAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deliverableUrl\":\"https://github.com/devcollab/e2e/pull/1\",\"submissionNotes\":\"Ready\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SUBMITTED"));
+
+        mockMvc.perform(post("/api/milestones/" + sharedMilestoneId + "/approve")
+                        .with(authentication(startupAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAYMENT_PROCESSING"))
+                .andExpect(jsonPath("$.data.transactionId").isNotEmpty());
 
         Milestone m = milestoneRepository.findById(sharedMilestoneId).orElseThrow();
         assertThat(m.getStatus()).isEqualTo(MilestoneStatus.PAYMENT_PROCESSING);
+        assertThat(m.getApprovedBy()).isEqualTo(sharedStartupId.toString());
+        assertThat(m.getApprovedAt()).isNotNull();
 
         // A PENDING transaction must exist
         assertThat(transactionRepository.existsByMilestoneIdAndStatus(
                 sharedMilestoneId, TransactionStatus.PENDING)).isTrue();
+
+        // Party emails are remembered on the contract for reminder emails
+        var contract = contractRepository.findById(m.getContract().getId()).orElseThrow();
+        assertThat(contract.getStudentEmail()).isEqualTo("student@e2e.test");
+        assertThat(contract.getStartupEmail()).isEqualTo("startup@e2e.test");
     }
 
     @Test
     @Order(7)
-    @DisplayName("Flow B-4: Duplicate release (same Idempotency-Key) → 200 idempotent, only 1 TX")
+    @DisplayName("Flow B-4: Release while checkout is open → 200, resumes the same order, only 1 TX")
     void flowB4_duplicateRelease_isIdempotent() throws Exception {
-        String idempotencyKey = "e2e-release-" + sharedMilestoneId;
-
         mockMvc.perform(post("/api/milestones/" + sharedMilestoneId + "/release")
-                        .with(authentication(startupAuth()))
-                        .header("Idempotency-Key", idempotencyKey))
-                .andExpect(status().isOk());
+                        .with(authentication(startupAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.transactionId").isNotEmpty());
 
         // Still PAYMENT_PROCESSING — not double-processed
         Milestone m = milestoneRepository.findById(sharedMilestoneId).orElseThrow();

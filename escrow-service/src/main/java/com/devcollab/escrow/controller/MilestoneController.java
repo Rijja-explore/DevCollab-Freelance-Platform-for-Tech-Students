@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.devcollab.escrow.enums.MilestoneStatus;
 
 import java.util.UUID;
 
@@ -52,10 +53,16 @@ public class MilestoneController {
     @Operation(summary = "List all milestones")
     public ResponseEntity<ApiResponse<PageResponse<MilestoneResponse>>> getAllMilestones(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) UUID contractId,
+            @RequestParam(required = false) MilestoneStatus status) {
 
-        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return ResponseEntity.ok(ApiResponse.success(milestoneService.getAll(pageable)));
+        // Within one contract, show milestones in delivery order; otherwise newest first
+        Sort sort = contractId != null
+                ? Sort.by("sequenceOrder").ascending().and(Sort.by("createdAt"))
+                : Sort.by("createdAt").descending();
+        PageRequest pageable = PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)), sort);
+        return ResponseEntity.ok(ApiResponse.success(milestoneService.getAll(pageable, contractId, status)));
     }
 
     @PutMapping("/{id}")
@@ -78,6 +85,7 @@ public class MilestoneController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         String actor = principal != null ? principal.getEmail() : "system";
+        rememberParty(id, principal);
         MilestoneResponse response = milestoneService.startMilestone(id, actor);
         return ResponseEntity.ok(ApiResponse.success(response, "Milestone work started"));
     }
@@ -91,6 +99,7 @@ public class MilestoneController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         String actor = principal != null ? principal.getEmail() : "system";
+        rememberParty(id, principal);
         MilestoneResponse response = milestoneService.submitMilestone(id, request, actor);
         return ResponseEntity.ok(ApiResponse.success(response, "Milestone deliverable submitted for review"));
     }
@@ -104,13 +113,14 @@ public class MilestoneController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         String actor = principal != null ? principal.getEmail() : "system";
+        rememberParty(id, principal);
         MilestoneResponse response = milestoneService.requestChanges(id, request, actor);
         return ResponseEntity.ok(ApiResponse.success(response, "Changes requested for milestone deliverable"));
     }
 
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('STARTUP', 'ADMIN')")
-    @Operation(summary = "Approve a submitted milestone and prepare for payment release")
+    @Operation(summary = "Approve a submitted milestone; the escrowed payment is released automatically")
     public ResponseEntity<ApiResponse<MilestoneResponse>> approveMilestone(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -119,8 +129,24 @@ public class MilestoneController {
                 ? principal.getUserId().toString()
                 : (principal != null && principal.getEmail() != null ? principal.getEmail() : "system");
         String actorEmail = principal != null ? principal.getEmail() : "system";
+        rememberParty(id, principal);
         MilestoneResponse response = milestoneService.approveMilestone(id, actorId, actorEmail);
-        return ResponseEntity.ok(ApiResponse.success(response, "Milestone approved. Ready for payment release."));
+        if (response.getStatus() == com.devcollab.escrow.enums.MilestoneStatus.FAILED) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(ApiResponse.<MilestoneResponse>builder()
+                            .success(false)
+                            .message("Milestone approved, but the payment order could not be created. You can retry the release.")
+                            .error(ApiResponse.ErrorDetails.builder()
+                                    .code("PAYMENT_GATEWAY_ERROR")
+                                    .message("Milestone approved, but the payment order could not be created. Please retry.")
+                                    .build())
+                            .data(response)
+                            .build());
+        }
+        String message = response.getStatus() == com.devcollab.escrow.enums.MilestoneStatus.RELEASED
+                ? "Milestone approved and payment released."
+                : "Milestone approved. Payment release started — complete checkout to transfer the funds.";
+        return ResponseEntity.ok(ApiResponse.success(response, message));
     }
 
     @PostMapping("/{id}/release")
@@ -160,6 +186,7 @@ public class MilestoneController {
             @AuthenticationPrincipal UserPrincipal principal) {
 
         String actor = principal != null ? principal.getEmail() : "system";
+        rememberParty(id, principal);
         MilestoneResponse response = milestoneService.disputeMilestone(id, request, actor);
         return ResponseEntity.ok(ApiResponse.success(response, "Milestone dispute raised"));
     }
@@ -175,6 +202,15 @@ public class MilestoneController {
         String actor = principal != null ? principal.getEmail() : "admin";
         MilestoneResponse response = milestoneService.resolveDispute(id, request, actor);
         return ResponseEntity.ok(ApiResponse.success(response, "Milestone dispute resolved"));
+    }
+
+    private void rememberParty(UUID milestoneId, UserPrincipal principal) {
+        if (principal == null || principal.getRoles() == null) {
+            return;
+        }
+        String role = principal.getRoles().contains("STUDENT") ? "STUDENT"
+                : principal.getRoles().contains("STARTUP") ? "STARTUP" : null;
+        milestoneService.rememberPartyEmail(milestoneId, role, principal.getEmail());
     }
 
     @PostMapping("/{id}/complete")

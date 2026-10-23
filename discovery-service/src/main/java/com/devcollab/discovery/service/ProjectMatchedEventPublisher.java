@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -23,6 +24,7 @@ import java.util.*;
 public class ProjectMatchedEventPublisher {
 
     private final RabbitTemplate rabbitTemplate;
+    private final JdbcTemplate jdbcTemplate;
 
     @Value("${events.exchange:devcollab.events}")
     private String exchange;
@@ -78,6 +80,9 @@ public class ProjectMatchedEventPublisher {
         payload.put("total_budget", total);
         payload.put("currency", project.getCurrency() != null ? project.getCurrency() : "USD");
         payload.put("milestones", milestones);
+        // Lets escrow email payment reminders to both parties
+        payload.put("startupEmail", lookupEmail(project.getStartupId()));
+        payload.put("studentEmail", lookupEmail(studentId));
 
         Map<String, Object> eventEnvelope = new LinkedHashMap<>();
         eventEnvelope.put("eventId", eventId);
@@ -93,6 +98,20 @@ public class ProjectMatchedEventPublisher {
             log.info("Successfully published project.matched event {} to exchange '{}' key '{}'", eventId, exchange, routingKey);
         } catch (Exception e) {
             log.warn("RabbitMQ publish failed for event {} (broker may be starting): {}", eventId, e.getMessage());
+        }
+    }
+
+    private String lookupEmail(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return null;
+        }
+        try {
+            List<String> emails = jdbcTemplate.queryForList(
+                    "SELECT email FROM auth_user WHERE id = ?", String.class, userId);
+            return emails.isEmpty() ? null : emails.get(0);
+        } catch (Exception e) {
+            log.warn("Could not resolve email for user {}: {}", userId, e.getMessage());
+            return null;
         }
     }
 

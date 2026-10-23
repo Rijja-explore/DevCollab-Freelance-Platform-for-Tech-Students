@@ -1,17 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
-import { milestonesApi, contractsApi, transactionsApi } from '../api/client';
-import { useApi } from '../hooks/useApi';
+import { milestonesApi, contractsApi, transactionsApi, remindersApi } from '../api/client';
+import { useApi, apiErrorMessage } from '../hooks/useApi';
 import { TableSkeleton } from '../components/LoadingSkeleton';
 import { StatusBadge } from '../components/StatusBadge';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import {
   Calendar,
   CheckCircle,
   Play,
   ExternalLink,
   X,
+  Eye,
+  Send,
+  AlertTriangle,
+  Scale,
+  Bell,
+  RefreshCw,
+  Mail,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ServiceHeader } from '../components/ServiceHeader';
@@ -123,10 +130,35 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ order, onClose, onCapture
 
 import { useAuth } from '../contexts/AuthContext';
 
+type ActionModal =
+  | { kind: 'submit'; milestone: any }
+  | { kind: 'review'; milestone: any }
+  | { kind: 'dispute'; milestone: any }
+  | { kind: 'resolve'; milestone: any }
+  | null;
+
+const STATUS_GUIDE: { status: string; color: string; text: string }[] = [
+  { status: 'PENDING', color: 'text-slate-300', text: 'Created — student can start work' },
+  { status: 'IN_PROGRESS', color: 'text-sky-300', text: 'Student is working / revising' },
+  { status: 'SUBMITTED', color: 'text-violet-300', text: 'Deliverable awaiting startup review' },
+  { status: 'PAYMENT_PROCESSING', color: 'text-blue-300', text: 'Approved — payment released automatically, completing checkout' },
+  { status: 'RELEASED', color: 'text-emerald-300', text: 'Funds released to the student' },
+  { status: 'DISPUTED', color: 'text-rose-300', text: 'Frozen until an admin resolves it' },
+];
+
+const REMINDER_LABELS: Record<string, string> = {
+  OVERDUE_MILESTONE: 'Overdue',
+  UPCOMING_DUE_DATE: 'Due soon',
+  PENDING_APPROVAL_REMINDER: 'Review needed',
+  PENDING_RELEASE_REMINDER: 'Payment pending',
+};
+
 export const Milestones: React.FC = () => {
-  const { role, user } = useAuth();
+  const { role } = useAuth();
   const [searchParams] = useSearchParams();
   const contractIdParam = searchParams.get('contractId');
+  const isStartup = role === 'STARTUP' || role === 'ADMIN';
+  const isStudent = role === 'STUDENT';
 
   const [page, setPage] = useState(0);
   const [selectedContract, setSelectedContract] = useState<any>(null);
@@ -136,25 +168,29 @@ export const Milestones: React.FC = () => {
   const [editDescription, setEditDescription] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
 
+  const [modal, setModal] = useState<ActionModal>(null);
+  const [deliverableUrl, setDeliverableUrl] = useState('');
+  const [submissionNotes, setSubmissionNotes] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [disputeReason, setDisputeReason] = useState('');
+  const [resolution, setResolution] = useState<'RELEASE' | 'REFUND' | 'REOPEN'>('REOPEN');
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [remindersLoading, setRemindersLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
+
+  const fetchPage = useCallback(
+    (p: number) => milestonesApi.getAll(p, 20, contractIdParam),
+    [contractIdParam]
+  );
+
   const {
     data: milestonesData,
     loading,
     execute: fetchMilestones,
-  } = useApi<any, [number]>(milestonesApi.getAll);
-
-  const { execute: approveMilestone, loading: approving } = useApi<any, [string]>(
-    milestonesApi.approve,
-    {
-      successMessage: 'Milestone approved. You can now fund this milestone via PayPal.',
-    }
-  );
-
-  const { execute: releaseMilestone, loading: releasing } = useApi<any, [string]>(
-    milestonesApi.release,
-    {
-      successMessage: 'PayPal payment order created. Complete the checkout to release funds to student.',
-    }
-  );
+  } = useApi<any, [number]>(fetchPage);
 
   const { execute: updateMilestone, loading: updating } = useApi<any, [string, any]>(
     milestonesApi.update,
@@ -167,200 +203,309 @@ export const Milestones: React.FC = () => {
     }
   );
 
-  useEffect(() => {
-    fetchMilestones(page);
-    if (contractIdParam) {
-      contractsApi.getById(contractIdParam).then((res) => {
-        setSelectedContract(res.data?.data ?? res.data);
-      });
+  const loadReminders = useCallback(async () => {
+    setRemindersLoading(true);
+    try {
+      const res = contractIdParam
+        ? await remindersApi.getByContract(contractIdParam)
+        : await remindersApi.getAll(0, 10);
+      const data = res.data?.data;
+      setReminders(Array.isArray(data) ? data.slice(0, 10) : data?.content ?? []);
+    } catch (err) {
+      console.error('Failed to load reminders', err);
+      setReminders([]);
+    } finally {
+      setRemindersLoading(false);
     }
-  }, [page, contractIdParam, fetchMilestones]);
+  }, [contractIdParam]);
+
+  useEffect(() => {
+    fetchMilestones(page).catch(() => undefined);
+  }, [page, fetchMilestones]);
+
+  useEffect(() => {
+    setPage(0);
+    if (contractIdParam) {
+      contractsApi
+        .getById(contractIdParam)
+        .then((res) => setSelectedContract(res.data?.data ?? res.data))
+        .catch(() => setSelectedContract(null));
+    } else {
+      setSelectedContract(null);
+    }
+  }, [contractIdParam]);
+
+  useEffect(() => {
+    loadReminders();
+  }, [loadReminders]);
+
+  const refresh = () => {
+    fetchMilestones(page).catch(() => undefined);
+    loadReminders();
+  };
+
+  /** Runs a milestone action with consistent busy state, toasts and refresh. */
+  const runAction = async (id: string, action: () => Promise<any>, success: string) => {
+    setBusyId(id);
+    try {
+      const res = await action();
+      toast.success(res?.data?.message || success);
+      setModal(null);
+      refresh();
+      return res?.data?.data;
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+      return undefined;
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const capturePayment = async (transactionId: string) => {
     try {
       await transactionsApi.capture(transactionId);
       toast.success('Payment captured! Funds have been released to the student.');
       setPaypalOrder(null);
-      fetchMilestones(page);
+      refresh();
     } catch (err) {
       console.error(err);
-      toast.error('Payment capture failed. Please check PayPal Sandbox or try again.');
+      toast.error(apiErrorMessage(err, 'Payment capture failed. Please try again.'));
     }
   };
 
-  const handlePay = async (milestoneId: string, amount: number, contractTitle: string) => {
+  /** Opens checkout for a milestone response that carries the payment order details. */
+  const openCheckout = (milestone: any, data: any) => {
+    if (!data?.transactionId) {
+      toast.error('Payment order details are not available yet. Please refresh and try again.');
+      return;
+    }
+    let approveUrl = data.approveUrl;
+    if (approveUrl) {
+      const cancelUrl = `/payment-cancel?milestoneId=${milestone.id}&title=${encodeURIComponent(milestone.title)}&amount=${milestone.amount}`;
+      const returnUrl = `/payment-success?transactionId=${data.transactionId}&milestoneId=${milestone.id}`;
+      approveUrl = approveUrl
+        .replace(/CANCEL_URL[^&]*/g, `CANCEL_URL=${encodeURIComponent(cancelUrl)}`)
+        .replace(/RETURN_URL[^&]*/g, `RETURN_URL=${encodeURIComponent(returnUrl)}`);
+    }
+    setPaypalOrder({
+      orderId: data.providerOrderId,
+      transactionId: data.transactionId,
+      milestoneId: milestone.id,
+      amount: milestone.amount,
+      title: milestone.title,
+      approveUrl,
+    });
+  };
+
+  /** Approval releases the payment automatically; then open checkout to complete it. */
+  const handleApprove = async (milestone: any) => {
+    setBusyId(milestone.id);
     try {
-      console.log(`[handlePay] Starting payment for milestone: ${milestoneId}, amount: ${amount}, title: ${contractTitle}`)
-      
-      const milestoneRes = await releaseMilestone(milestoneId);
-      const milestoneData = milestoneRes?.data ?? milestoneRes;
-
-      console.log('[handlePay] Milestone release response:', milestoneData);
-
-      let orderId = milestoneData?.providerOrderId;
-      let transactionId = milestoneData?.transactionId;
-      
-      console.log(`[handlePay] Got orderId: ${orderId}, transactionId: ${transactionId}`)
-      
-      if (!orderId || !transactionId) {
-        console.log('[handlePay] Order or transaction ID missing, fetching from transactions API...');
-        try {
-          const txs = await transactionsApi.getAll(0, 50);
-          const all = txs.data?.data?.content ?? txs.data?.content ?? txs.data?.data ?? [];
-          console.log(`[handlePay] Found ${all.length} transactions, filtering for milestoneId: ${milestoneId}`)
-          
-          const tx = all
-            .filter((t: any) => t.milestoneId === milestoneId)
-            .sort((a: any, b: any) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            )[0];
-          
-          if (tx) {
-            orderId = tx?.providerOrderId;
-            transactionId = tx?.id;
-            console.log('[handlePay] Retrieved transaction:', tx);
-          } else {
-            console.warn('[handlePay] No transaction found for this milestone')
-          }
-        } catch (txErr) {
-          console.error('[handlePay] Error fetching transactions:', txErr)
-        }
-      }
-
-      if (!orderId || !transactionId) {
-        // Order creation succeeded but we couldn't retrieve the IDs
-        // This might be a timing issue, so just warn and don't block the UI
-        console.warn(`[handlePay] Could not retrieve orderId or transactionId - order may have been created but details not yet available`);
-        toast('Payment order created but details loading. Please wait a moment...', { icon: '⏳' });
-        
-        // Try again after a delay
-        setTimeout(() => {
-          handlePay(milestoneId, amount, contractTitle);
-        }, 2000);
-        return;
-      }
-
-      let approveUrl = milestoneData?.approveUrl || milestoneData?.data?.approveUrl;
-      
-      console.log(`[handlePay] Setting PayPal order with orderId: ${orderId}, transactionId: ${transactionId}, approveUrl: ${!!approveUrl}`)
-      
-      // Add cancel and return URLs with milestone info for retry functionality
-      if (approveUrl) {
-        const cancelUrl = `/payment-cancel?milestoneId=${milestoneId}&title=${encodeURIComponent(contractTitle)}&amount=${amount}`;
-        const returnUrl = `/payment-success?transactionId=${transactionId}&milestoneId=${milestoneId}`;
-        
-        // Update URLs in approveUrl if needed
-        approveUrl = approveUrl
-          .replace(/CANCEL_URL[^&]*/g, `CANCEL_URL=${encodeURIComponent(cancelUrl)}`)
-          .replace(/RETURN_URL[^&]*/g, `RETURN_URL=${encodeURIComponent(returnUrl)}`);
-      }
-
-      // Set the order to open the modal
-      setPaypalOrder({
-        orderId,
-        transactionId,
-        milestoneId,
-        amount,
-        title: contractTitle,
-        approveUrl,
-      });
-      
-      console.log('[handlePay] PayPal order set, modal should open')
+      const res = await milestonesApi.approve(milestone.id);
+      toast.success(res.data?.message || 'Milestone approved — payment released.');
+      setModal(null);
+      refresh();
+      openCheckout(milestone, res.data?.data);
     } catch (err: any) {
-      console.error('[handlePay] Payment checkout error:', err);
-      const errorMessage = err.message || 'Failed to trigger payment checkout flow';
-      toast.error(errorMessage);
-      setPaypalOrder(null);
+      toast.error(apiErrorMessage(err));
+      refresh();
+    } finally {
+      setBusyId(null);
     }
   };
 
-  const handleApprove = async (id: string) => {
-    await approveMilestone(id);
-    fetchMilestones(page);
+  /** Retries a failed release, or resumes an open checkout. */
+  const handleRelease = async (milestone: any) => {
+    setBusyId(milestone.id);
+    try {
+      const res = await milestonesApi.release(milestone.id);
+      refresh();
+      openCheckout(milestone, res.data?.data);
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+      refresh();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleRunReminders = async () => {
+    setScanning(true);
+    try {
+      const res = await remindersApi.trigger();
+      toast.success(res.data?.data?.message || 'Reminder scan complete');
+      loadReminders();
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const openModal = (next: ActionModal) => {
+    setDeliverableUrl(next?.milestone?.deliverableUrl || '');
+    setSubmissionNotes('');
+    setFeedback('');
+    setDisputeReason('');
+    setResolution('REOPEN');
+    setResolutionNotes('');
+    setModal(next);
   };
 
   const milestonesList = milestonesData?.content ?? milestonesData?.data?.content ?? (Array.isArray(milestonesData) ? milestonesData : []);
-  const totalPages = milestonesData?.totalPages ?? milestonesData?.data?.totalPages ?? 1;
+  const totalPages = Math.max(1, milestonesData?.totalPages ?? milestonesData?.data?.totalPages ?? 1);
 
-  // Filter milestones so they are visible only to the particular student and startup owner
-  const filteredMilestones = milestonesList.filter((m: any) => {
-    if (contractIdParam && m.contractId !== contractIdParam) return false;
-    if (m.contract) {
-      const isParticipant =
-        !user?.id ||
-        m.contract.studentId === user?.id ||
-        m.contract.studentId === user?.profileId ||
-        m.contract.startupId === user?.id ||
-        m.contract.startupId === user?.profileId;
-      if (!isParticipant) return false;
-    }
-    return true;
-  });
+  const canDispute = (m: any) => !['RELEASED', 'DISPUTED', 'PAYMENT_PROCESSING'].includes(m.status);
+
+  const renderStartupActions = (m: any) => {
+    const busy = busyId === m.id;
+    return (
+      <>
+        {(m.status === 'PENDING' || m.status === 'IN_PROGRESS') && (
+          <>
+            <span className="text-[11px] text-slate-500">Awaiting deliverable</span>
+            <button
+              onClick={() => {
+                setEditingMilestone(m);
+                setEditTitle(m.title);
+                setEditDescription(m.description || '');
+                setEditDueDate(m.dueDate ? String(m.dueDate).split('T')[0] : '');
+              }}
+              className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-medium border border-white/10"
+            >
+              Edit
+            </button>
+          </>
+        )}
+        {m.status === 'SUBMITTED' && (
+          <button
+            onClick={() => openModal({ kind: 'review', milestone: m })}
+            disabled={busy}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#ffc439] to-[#f4b628] hover:brightness-105 text-slate-950 font-bold text-xs shadow-md flex items-center gap-1.5"
+          >
+            <Eye className="w-3.5 h-3.5" /> Review deliverable
+          </button>
+        )}
+        {(m.status === 'APPROVED' || m.status === 'FAILED') && (
+          <button
+            onClick={() => handleRelease(m)}
+            disabled={busy}
+            className="px-3 py-1.5 rounded-xl font-bold text-xs shadow-md flex items-center gap-1.5 text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:opacity-50"
+          >
+            <Play className="w-3 h-3 fill-current" /> Retry payment release
+          </button>
+        )}
+        {m.status === 'PAYMENT_PROCESSING' && (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => runAction(m.id, () => milestonesApi.complete(m.id), 'Milestone completed! Funds released to student.')}
+              className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold text-xs shadow-md flex items-center gap-1.5 disabled:opacity-50"
+              title="Mark this milestone completed and release payment"
+            >
+              <CheckCircle className="w-3.5 h-3.5" /> Complete
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRelease(m)}
+              disabled={busy}
+              className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-semibold text-xs border border-white/10 flex items-center gap-1"
+              title="Re-open checkout for the pending payment order"
+            >
+              <Play className="w-3 h-3 fill-current text-amber-400" /> Checkout
+            </button>
+          </div>
+        )}
+        {m.status === 'RELEASED' && (
+          <Link to="/payments" className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:underline">
+            <CheckCircle className="w-3.5 h-3.5" /> Payout disbursed
+          </Link>
+        )}
+      </>
+    );
+  };
+
+  const renderStudentActions = (m: any) => {
+    const busy = busyId === m.id;
+    return (
+      <>
+        {m.status === 'PENDING' && (
+          <button
+            onClick={() => runAction(m.id, () => milestonesApi.start(m.id), 'Work started on milestone')}
+            disabled={busy}
+            className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-semibold text-xs border border-white/10 flex items-center gap-1 disabled:opacity-50"
+          >
+            <Play className="w-3 h-3 fill-current" /> Start
+          </button>
+        )}
+        {(m.status === 'PENDING' || m.status === 'IN_PROGRESS') && (
+          <button
+            onClick={() => openModal({ kind: 'submit', milestone: m })}
+            disabled={busy}
+            className="px-3 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <Send className="w-3.5 h-3.5" /> {m.revisionCount > 0 ? 'Resubmit' : 'Submit deliverable'}
+          </button>
+        )}
+        {m.status === 'SUBMITTED' && <span className="text-[11px] text-violet-300">Awaiting startup review</span>}
+        {(m.status === 'APPROVED' || m.status === 'PAYMENT_PROCESSING') && (
+          <span className="text-[11px] text-blue-300">Approved — payment on its way</span>
+        )}
+        {m.status === 'FAILED' && <span className="text-[11px] text-rose-300">Payment failed — startup will retry</span>}
+        {m.status === 'RELEASED' && (
+          <Link to="/payments" className="text-[11px] text-emerald-400 hover:underline">✓ Paid & settled</Link>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="space-y-6">
-      {/* Service 3 Escrow Banner */}
       <ServiceHeader
         service="escrow"
-        title="Escrow Milestones & PayPal Checkout"
-        subtitle="Track project deliverables, initiate PayPal sandbox order authorizations, and capture milestone disbursements. Students are notified automatically when payments are released."
+        title="Escrow Milestones"
+        subtitle="Students submit deliverables, startups review them, and approval releases the escrowed payment automatically. Automated reminders keep deadlines and pending payments moving."
       />
 
       {selectedContract && (
         <div className="card p-4 border border-brand-500/20 bg-brand-500/5 flex items-center justify-between">
           <div className="text-sm">
-            <span className="text-slate-400">Filtering milestones for contract:</span>{' '}
+            <span className="text-slate-400">Showing milestones for contract:</span>{' '}
             <strong className="text-white">{selectedContract.title}</strong>
           </div>
           <Link to="/milestones" className="text-xs text-brand-400 hover:underline">
-            Show All
+            Show all
           </Link>
         </div>
       )}
 
-      {/* Payment Status Guide */}
+      {/* Workflow guide */}
       <div className="card p-4 border border-emerald-500/20 bg-emerald-500/5">
-        <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">Payment Status Guide</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
-          <div className="p-2 rounded bg-white/5">
-            <div className="font-semibold text-slate-300">PENDING</div>
-            <div className="text-slate-500 text-[10px]">Milestone created, waiting for approval</div>
-          </div>
-          <div className="p-2 rounded bg-white/5">
-            <div className="font-semibold text-amber-300">APPROVED</div>
-            <div className="text-slate-500 text-[10px]">Ready for payment, startup can fund</div>
-          </div>
-          <div className="p-2 rounded bg-white/5">
-            <div className="font-semibold text-blue-300">PAYMENT_PROCESSING</div>
-            <div className="text-slate-500 text-[10px]">Payment initiated, processing via PayPal</div>
-          </div>
-          <div className="p-2 rounded bg-white/5">
-            <div className="font-semibold text-emerald-300">RELEASED</div>
-            <div className="text-slate-500 text-[10px]">Payment completed, funds released to student</div>
-          </div>
+        <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">Milestone workflow</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 text-xs">
+          {STATUS_GUIDE.map((g) => (
+            <div key={g.status} className="p-2 rounded bg-white/5">
+              <div className={`font-semibold ${g.color}`}>{g.status.replace('_', ' ')}</div>
+              <div className="text-slate-500 text-[10px]">{g.text}</div>
+            </div>
+          ))}
         </div>
-        <p className="text-[10px] text-slate-500 mt-2">
-          Students receive automatic notifications when payments reach RELEASED status.
-          Check the <Link to="/transactions" className="text-brand-400 hover:underline">Transactions</Link> page for payment history.
-        </p>
       </div>
 
-      {/* Main Table */}
-      {loading ? (
+      {loading && milestonesList.length === 0 ? (
         <TableSkeleton rows={4} />
-      ) : filteredMilestones.length === 0 ? (
-        <div className="card p-12 text-center text-slate-400">
-          No milestones registered or matching filters.
-        </div>
+      ) : milestonesList.length === 0 ? (
+        <div className="card p-12 text-center text-slate-400">No milestones found.</div>
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
+            <table className="w-full min-w-[900px]">
               <thead>
                 <tr className="bg-white/5 border-b border-white/10">
-                  <th className="table-header">Sequence</th>
-                  <th className="table-header">Title & Description</th>
-                  <th className="table-header">Contract ID</th>
+                  <th className="table-header">#</th>
+                  <th className="table-header">Title & Deliverable</th>
+                  <th className="table-header">Contract</th>
                   <th className="table-header">Amount</th>
                   <th className="table-header">Status</th>
                   <th className="table-header">Due Date</th>
@@ -368,204 +513,106 @@ export const Milestones: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
-                {filteredMilestones.map((milestone: any) => (
-                  <tr key={milestone.id} className="table-row">
-                    <td className="table-cell font-bold text-slate-400">
-                      #{milestone.sequenceOrder}
-                    </td>
-                    <td className="table-cell">
-                      <div>
+                {milestonesList.map((milestone: any) => {
+                  const overdue =
+                    milestone.dueDate &&
+                    ['PENDING', 'IN_PROGRESS'].includes(milestone.status) &&
+                    new Date(milestone.dueDate) < new Date(new Date().toDateString());
+                  return (
+                    <tr key={milestone.id} className="table-row align-top">
+                      <td className="table-cell font-bold text-slate-400">#{milestone.sequenceOrder}</td>
+                      <td className="table-cell">
                         <div className="font-semibold text-slate-200">{milestone.title}</div>
-                        <div className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">
-                          {milestone.description}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="table-cell font-mono text-xs text-slate-400">
-                      <Link
-                        to={`/contracts?id=${milestone.contractId}`}
-                        className="hover:text-brand-400 flex items-center gap-1.5"
-                      >
-                        {milestone.contractId.slice(0, 8)}...
-                        <ExternalLink className="w-3 h-3 text-slate-500" />
-                      </Link>
-                    </td>
-                    <td className="table-cell text-white font-medium">
-                      ${Number(milestone.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
-                    </td>
-                    <td className="table-cell">
-                      <StatusBadge status={milestone.status} />
-                      {milestone.status === 'RELEASED' && (
-                        <div className="text-[9px] text-emerald-400 mt-1">
-                          ✓ Payment released to student
-                        </div>
-                      )}
-                      {milestone.status === 'PAYMENT_PROCESSING' && (
-                        <div className="text-[9px] text-amber-400 mt-1">
-                          ⏳ Payment being processed
-                        </div>
-                      )}
-                      {milestone.status === 'FAILED' && (
-                        <div className="text-[9px] text-red-400 mt-1">
-                          ❌ Payment failed — Click Retry
-                        </div>
-                      )}
-                    </td>
-                    <td className="table-cell text-slate-400 text-xs">
-                      {milestone.dueDate ? (
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                          {format(new Date(milestone.dueDate), 'dd MMM yyyy')}
-                        </div>
-                      ) : (
-                        '--'
-                      )}
-                    </td>
-                    <td className="table-cell text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {(role === 'STARTUP' || role === 'ADMIN') ? (
-                          <>
-                            {/* Edit button - only for PENDING/IN_PROGRESS milestones */}
-                            {(milestone.status === 'PENDING' || milestone.status === 'IN_PROGRESS') && (
-                              <button
-                                onClick={() => {
-                                  setEditingMilestone(milestone);
-                                  setEditTitle(milestone.title);
-                                  setEditDescription(milestone.description);
-                                  setEditDueDate(milestone.dueDate ? new Date(milestone.dueDate).toISOString().split('T')[0] : '');
-                                }}
-                                className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-medium border border-white/10"
-                                title="Edit milestone"
-                              >
-                                Edit
-                              </button>
-                            )}
-                            
-                            {(milestone.status === 'PENDING' || milestone.status === 'SUBMITTED' || milestone.status === 'IN_PROGRESS') && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    console.log('[Approve & Fund] Starting...')
-                                    try {
-                                      await handleApprove(milestone.id);
-                                    } catch (approveErr: any) {
-                                      console.warn('[Approve & Fund] Approval step notice:', approveErr);
-                                    }
-                                    // Wait a small moment then launch PayPal payment flow
-                                    await new Promise(resolve => setTimeout(resolve, 300));
-                                    await handlePay(milestone.id, milestone.amount, milestone.title);
-                                  } catch (err) {
-                                    console.error('[Approve & Fund] Error during payment flow:', err);
-                                    toast.error('Failed to trigger payment flow. Please try again.');
-                                  }
-                                }}
-                                disabled={approving || releasing}
-                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#ffc439] to-[#f4b628] hover:brightness-105 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/10 flex items-center gap-1.5 transition-all"
-                              >
-                                <Play className="w-3 h-3 fill-current" />
-                                Approve & Fund via PayPal
-                              </button>
-                            )}
-                            {(milestone.status === 'APPROVED' || milestone.status === 'FAILED') && (
-                              <button
-                                onClick={() =>
-                                  handlePay(
-                                    milestone.id,
-                                    milestone.amount,
-                                    milestone.title
-                                  )
-                                }
-                                disabled={releasing}
-                                className={`px-3 py-1.5 rounded-xl font-bold text-xs shadow-md flex items-center gap-1.5 transition-all text-white ${
-                                  milestone.status === 'FAILED'
-                                    ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-500/20'
-                                    : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-emerald-500/10'
-                                }`}
-                              >
-                                <Play className="w-3 h-3 fill-current" />
-                                {milestone.status === 'FAILED' ? 'Retry Payment Release' : 'Release Payment via PayPal'}
-                              </button>
-                            )}
-                            {milestone.status === 'PAYMENT_PROCESSING' && (
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    try {
-                                      toast.loading('Confirming and releasing milestone payment...');
-                                      await milestonesApi.complete(milestone.id);
-                                      toast.dismiss();
-                                      toast.success('Milestone completed! Funds released to student.');
-                                      fetchMilestones(page);
-                                    } catch (err: any) {
-                                      toast.dismiss();
-                                      toast.error(err.response?.data?.message || 'Failed to complete milestone');
-                                    }
-                                  }}
-                                  className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold text-xs shadow-md shadow-emerald-500/20 flex items-center gap-1.5 transition-all"
-                                  title="Mark this milestone completed and release payment"
-                                >
-                                  <CheckCircle className="w-3.5 h-3.5" />
-                                  Complete Milestone
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handlePay(
-                                      milestone.id,
-                                      milestone.amount,
-                                      milestone.title
-                                    )
-                                  }
-                                  disabled={releasing}
-                                  className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-semibold text-xs border border-white/10 flex items-center gap-1 transition-all"
-                                  title="Re-open PayPal checkout popup"
-                                >
-                                  <Play className="w-3 h-3 fill-current text-amber-400" />
-                                  PayPal
-                                </button>
-                              </div>
-                            )}
-                            {milestone.status === 'RELEASED' && (
-                              <Link
-                                to="/payments"
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:underline"
-                              >
-                                <CheckCircle className="w-3.5 h-3.5" />
-                                Payout Disbursed
-                              </Link>
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-[11px] text-slate-400 font-medium">
-                            {milestone.status === 'RELEASED' ? (
-                              <Link to="/payments" className="text-emerald-400 hover:underline">
-                                ✓ Paid & Settled
-                              </Link>
-                            ) : (
-                              'Milestone in Escrow Vault'
-                            )}
-                          </span>
+                        {milestone.description && (
+                          <div className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{milestone.description}</div>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        {milestone.deliverableUrl && (
+                          <a
+                            href={milestone.deliverableUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-brand-400 hover:underline inline-flex items-center gap-1 mt-1"
+                          >
+                            <ExternalLink className="w-3 h-3" /> Deliverable
+                          </a>
+                        )}
+                        {milestone.status === 'IN_PROGRESS' && milestone.reviewFeedback && (
+                          <div className="mt-1.5 text-[11px] text-amber-300 max-w-xs">
+                            <span className="font-semibold">Changes requested:</span> {milestone.reviewFeedback}
+                          </div>
+                        )}
+                        {milestone.status === 'DISPUTED' && milestone.disputeReason && (
+                          <div className="mt-1.5 text-[11px] text-rose-300 max-w-xs">
+                            <span className="font-semibold">Dispute:</span> {milestone.disputeReason}
+                          </div>
+                        )}
+                      </td>
+                      <td className="table-cell font-mono text-xs text-slate-400">
+                        <Link to={`/milestones?contractId=${milestone.contractId}`} className="hover:text-brand-400">
+                          {String(milestone.contractId).slice(0, 8)}…
+                        </Link>
+                      </td>
+                      <td className="table-cell text-white font-medium whitespace-nowrap">
+                        ${Number(milestone.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="table-cell">
+                        <StatusBadge status={milestone.status} />
+                        {milestone.revisionCount > 0 && (
+                          <div className="text-[10px] text-slate-500 mt-1">
+                            {milestone.revisionCount} revision{milestone.revisionCount > 1 ? 's' : ''}
+                          </div>
+                        )}
+                      </td>
+                      <td className={`table-cell text-xs ${overdue ? 'text-rose-400 font-semibold' : 'text-slate-400'}`}>
+                        {milestone.dueDate ? (
+                          <div className="flex items-center gap-1.5 whitespace-nowrap">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {format(new Date(milestone.dueDate), 'dd MMM yyyy')}
+                            {overdue && <span className="text-[10px]">· overdue</span>}
+                          </div>
+                        ) : (
+                          '--'
+                        )}
+                      </td>
+                      <td className="table-cell text-right">
+                        <div className="flex items-center justify-end gap-2 flex-wrap">
+                          {isStartup ? renderStartupActions(milestone) : isStudent ? renderStudentActions(milestone) : null}
+                          {milestone.status === 'DISPUTED' && role === 'ADMIN' && (
+                            <button
+                              onClick={() => openModal({ kind: 'resolve', milestone })}
+                              className="px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1"
+                            >
+                              <Scale className="w-3.5 h-3.5" /> Resolve
+                            </button>
+                          )}
+                          {milestone.status === 'DISPUTED' && role !== 'ADMIN' && (
+                            <span className="text-[11px] text-rose-300">Awaiting admin decision</span>
+                          )}
+                          {(isStartup || isStudent) && canDispute(milestone) && (
+                            <button
+                              onClick={() => openModal({ kind: 'dispute', milestone })}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10"
+                              title="Raise a dispute"
+                              aria-label="Raise a dispute"
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination */}
           <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
             <span className="text-xs text-slate-400">
               Page {page + 1} of {totalPages}
             </span>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
-                className="btn-secondary py-1 px-3 text-xs"
-              >
+              <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="btn-secondary py-1 px-3 text-xs">
                 Previous
               </button>
               <button
@@ -580,67 +627,280 @@ export const Milestones: React.FC = () => {
         </div>
       )}
 
-      {/* PayPal / Escrow Checkout Modal */}
+      {/* Payment reminders */}
+      <div className="card p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Bell className="w-4 h-4 text-amber-400" /> Payment reminders
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              A daily scheduled job emails reminders for upcoming and overdue deadlines, deliverables awaiting review, and
+              approved payments that haven't completed.
+            </p>
+          </div>
+          {isStartup && (
+            <button onClick={handleRunReminders} disabled={scanning} className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5">
+              <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin' : ''}`} />
+              {scanning ? 'Checking…' : 'Run reminder check now'}
+            </button>
+          )}
+        </div>
+        {remindersLoading ? (
+          <div className="h-16 rounded-xl bg-white/5 animate-pulse" />
+        ) : reminders.length === 0 ? (
+          <p className="text-xs text-slate-500">No reminders have been sent{contractIdParam ? ' for this contract' : ''} yet.</p>
+        ) : (
+          <ul className="divide-y divide-white/5">
+            {reminders.map((r) => (
+              <li key={r.id} className="py-3 flex flex-col sm:flex-row sm:items-start gap-2 justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                      {REMINDER_LABELS[r.reminderType] ?? r.reminderType}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-200">{r.subject}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">{r.message}</p>
+                </div>
+                <div className="text-[10px] text-slate-500 sm:text-right shrink-0 flex sm:flex-col gap-2 sm:gap-0.5">
+                  {r.sentAt && <span>{formatDistanceToNow(new Date(r.sentAt), { addSuffix: true })}</span>}
+                  <span className="inline-flex items-center gap-1">
+                    <Mail className="w-3 h-3" />
+                    {r.status === 'SENT' ? `Emailed ${r.recipientEmail ?? ''}` : r.status === 'FAILED' ? 'Email failed' : 'In-app only'}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {paypalOrder && (
-        <CheckoutModal
-          order={paypalOrder}
-          onClose={() => setPaypalOrder(null)}
-          onCapture={capturePayment}
-        />
+        <CheckoutModal order={paypalOrder} onClose={() => setPaypalOrder(null)} onCapture={capturePayment} />
+      )}
+
+      {/* Workflow action modal */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setModal(null)}>
+          <div className="card w-full max-w-lg p-6 relative" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <button onClick={() => setModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white" aria-label="Close">
+              <X className="w-5 h-5" />
+            </button>
+            <p className="text-xs text-slate-500">
+              Milestone #{modal.milestone.sequenceOrder} · ${Number(modal.milestone.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </p>
+            <h3 className="text-lg font-bold text-white">{modal.milestone.title}</h3>
+
+            {modal.kind === 'submit' && (
+              <form
+                className="mt-5 space-y-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  runAction(
+                    modal.milestone.id,
+                    () => milestonesApi.submit(modal.milestone.id, {
+                      deliverableUrl: deliverableUrl.trim() || undefined,
+                      submissionNotes: submissionNotes.trim() || undefined,
+                    }),
+                    'Deliverable submitted for review'
+                  );
+                }}
+              >
+                {modal.milestone.reviewFeedback && (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
+                    <span className="font-semibold">Requested changes:</span> {modal.milestone.reviewFeedback}
+                  </div>
+                )}
+                <div>
+                  <label className="label">Deliverable link *</label>
+                  <input
+                    type="url"
+                    required
+                    value={deliverableUrl}
+                    onChange={(e) => setDeliverableUrl(e.target.value)}
+                    className="input"
+                    placeholder="https://github.com/org/repo/pull/12"
+                  />
+                </div>
+                <div>
+                  <label className="label">Notes for the reviewer</label>
+                  <textarea
+                    value={submissionNotes}
+                    onChange={(e) => setSubmissionNotes(e.target.value)}
+                    rows={3}
+                    className="input py-2"
+                    placeholder="What was delivered, how to test it…"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={() => setModal(null)} className="btn-secondary">Cancel</button>
+                  <button type="submit" disabled={busyId === modal.milestone.id} className="btn-primary">
+                    {busyId === modal.milestone.id ? 'Submitting…' : 'Submit for review'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {modal.kind === 'review' && (
+              <div className="mt-5 space-y-4">
+                <div className="p-3 rounded-lg bg-white/5 space-y-2 text-xs">
+                  {modal.milestone.deliverableUrl ? (
+                    <a href={modal.milestone.deliverableUrl} target="_blank" rel="noreferrer" className="text-brand-400 hover:underline inline-flex items-center gap-1 break-all">
+                      <ExternalLink className="w-3.5 h-3.5 shrink-0" /> {modal.milestone.deliverableUrl}
+                    </a>
+                  ) : (
+                    <span className="text-slate-500">No deliverable link provided.</span>
+                  )}
+                  {modal.milestone.submissionNotes && <p className="text-slate-300 whitespace-pre-line">{modal.milestone.submissionNotes}</p>}
+                  {modal.milestone.submittedAt && (
+                    <p className="text-[10px] text-slate-500">Submitted {formatDistanceToNow(new Date(modal.milestone.submittedAt), { addSuffix: true })}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="label">Feedback (required to request changes)</label>
+                  <textarea
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
+                    rows={3}
+                    className="input py-2"
+                    placeholder="What needs to change before you approve?"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Approving releases ${Number(modal.milestone.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} from escrow to the student.
+                </p>
+                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    disabled={busyId === modal.milestone.id || !feedback.trim()}
+                    onClick={() =>
+                      runAction(modal.milestone.id, () => milestonesApi.requestChanges(modal.milestone.id, feedback.trim()), 'Changes requested')
+                    }
+                    className="btn-secondary disabled:opacity-50"
+                  >
+                    Request changes
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === modal.milestone.id}
+                    onClick={() => handleApprove(modal.milestone)}
+                    className="btn-primary bg-emerald-600 hover:bg-emerald-500"
+                  >
+                    {busyId === modal.milestone.id ? 'Releasing…' : 'Approve & release payment'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {modal.kind === 'dispute' && (
+              <form
+                className="mt-5 space-y-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  runAction(modal.milestone.id, () => milestonesApi.dispute(modal.milestone.id, disputeReason.trim()), 'Dispute raised');
+                }}
+              >
+                <p className="text-xs text-slate-400">
+                  A dispute freezes this milestone and its contract until an admin resolves it.
+                </p>
+                <div>
+                  <label className="label">Reason *</label>
+                  <textarea
+                    required
+                    value={disputeReason}
+                    onChange={(e) => setDisputeReason(e.target.value)}
+                    rows={3}
+                    className="input py-2"
+                    placeholder="Describe the problem"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={() => setModal(null)} className="btn-secondary">Cancel</button>
+                  <button type="submit" disabled={busyId === modal.milestone.id || !disputeReason.trim()} className="btn-primary bg-rose-600 hover:bg-rose-500">
+                    Raise dispute
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {modal.kind === 'resolve' && (
+              <form
+                className="mt-5 space-y-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  runAction(
+                    modal.milestone.id,
+                    () => milestonesApi.resolveDispute(modal.milestone.id, resolution, resolutionNotes.trim() || undefined),
+                    'Dispute resolved'
+                  );
+                }}
+              >
+                {modal.milestone.disputeReason && (
+                  <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-200">
+                    {modal.milestone.disputeReason}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {([
+                    ['REOPEN', 'Reopen — send back to the student to continue work'],
+                    ['RELEASE', 'Release — approve and pay the student'],
+                    ['REFUND', 'Refund — mark the payment as failed / not owed'],
+                  ] as const).map(([value, text]) => (
+                    <label key={value} className="flex items-start gap-2 text-xs text-slate-300 cursor-pointer">
+                      <input type="radio" name="resolution" checked={resolution === value} onChange={() => setResolution(value)} className="mt-0.5" />
+                      {text}
+                    </label>
+                  ))}
+                </div>
+                <div>
+                  <label className="label">Notes</label>
+                  <textarea value={resolutionNotes} onChange={(e) => setResolutionNotes(e.target.value)} rows={2} className="input py-2" />
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={() => setModal(null)} className="btn-secondary">Cancel</button>
+                  <button type="submit" disabled={busyId === modal.milestone.id} className="btn-primary">Resolve dispute</button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Edit Milestone Modal */}
       {editingMilestone && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="card w-full max-w-md p-6 relative">
-            <button
-              onClick={() => setEditingMilestone(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-              aria-label="Close"
-            >
+            <button onClick={() => setEditingMilestone(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white" aria-label="Close">
               <X className="w-5 h-5" />
             </button>
 
             <h3 className="text-lg font-bold text-white">Edit Milestone</h3>
-            <p className="text-sm text-slate-400 mt-1">
-              Update milestone details (Sequence #{editingMilestone.sequenceOrder})
-            </p>
+            <p className="text-sm text-slate-400 mt-1">Update milestone details (Sequence #{editingMilestone.sequenceOrder})</p>
 
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (!editTitle.trim()) {
-                toast.error('Title is required');
-                return;
-              }
-              updateMilestone(editingMilestone.id, {
-                title: editTitle,
-                description: editDescription,
-                dueDate: editDueDate || undefined
-              });
-            }} className="mt-6 space-y-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!editTitle.trim()) {
+                  toast.error('Title is required');
+                  return;
+                }
+                updateMilestone(editingMilestone.id, {
+                  title: editTitle,
+                  description: editDescription,
+                  dueDate: editDueDate || undefined,
+                }).catch(() => undefined);
+              }}
+              className="mt-6 space-y-4"
+            >
               <div>
                 <label className="label">Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="input"
-                  placeholder="Milestone title"
-                />
+                <input type="text" required value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="input" placeholder="Milestone title" />
               </div>
-
               <div>
                 <label className="label">Description</label>
-                <textarea
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  rows={3}
-                  className="input py-2"
-                  placeholder="Milestone description"
-                />
+                <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} className="input py-2" placeholder="Milestone description" />
               </div>
-
               <div>
                 <label className="label">Due Date</label>
                 <input
@@ -650,24 +910,10 @@ export const Milestones: React.FC = () => {
                   className="input"
                   min={new Date().toISOString().split('T')[0]}
                 />
-                <p className="text-[10px] text-slate-500 mt-1">
-                  Optional: Set a future due date for this milestone
-                </p>
               </div>
-
               <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setEditingMilestone(null)}
-                  className="btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={updating}
-                  className="btn-primary"
-                >
+                <button type="button" onClick={() => setEditingMilestone(null)} className="btn-secondary">Cancel</button>
+                <button type="submit" disabled={updating} className="btn-primary">
                   {updating ? 'Updating...' : 'Update Milestone'}
                 </button>
               </div>

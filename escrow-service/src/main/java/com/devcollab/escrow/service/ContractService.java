@@ -76,6 +76,7 @@ public class ContractService {
                 .currency(request.getCurrency() != null ? request.getCurrency() : "USD")
                 .terms(request.getTerms())
                 .status(ContractStatus.ACTIVE)
+                .startupEmail(createdBy != null && createdBy.contains("@") ? createdBy : null)
                 .milestones(new ArrayList<>())
                 .build();
 
@@ -179,6 +180,16 @@ public class ContractService {
                                     String title, String description,
                                     java.math.BigDecimal totalBudget, String currency,
                                     List<MilestoneDefinitionData> milestoneDefs) {
+        return createFromEvent(projectId, startupId, studentId, title, description, totalBudget, currency,
+                milestoneDefs, null, null);
+    }
+
+    @Transactional
+    public Contract createFromEvent(UUID projectId, UUID startupId, UUID studentId,
+                                    String title, String description,
+                                    java.math.BigDecimal totalBudget, String currency,
+                                    List<MilestoneDefinitionData> milestoneDefs,
+                                    String startupEmail, String studentEmail) {
         log.info("Creating contract from event for project: {}", projectId);
 
         // Idempotency guard: skip if an ACTIVE contract already exists for this project
@@ -197,6 +208,8 @@ public class ContractService {
                 .totalAmount(totalBudget)
                 .currency(currency != null ? currency : "USD")
                 .status(ContractStatus.ACTIVE)
+                .startupEmail(blankToNull(startupEmail))
+                .studentEmail(blankToNull(studentEmail))
                 .milestones(new ArrayList<>())
                 .build();
 
@@ -235,6 +248,10 @@ public class ContractService {
                 "Contract auto-created from project.matched event for project: " + projectId);
 
         return contract;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     public record MilestoneDefinitionData(

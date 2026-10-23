@@ -91,7 +91,7 @@ class ProfileReviewServiceTest {
     @Test
     void testGetReviewsForStudentReturnsPagedResults() {
         Page<ProfileReview> page = new PageImpl<>(List.of(sampleReview));
-        given(studentProfileRepository.findByUserId("student-123")).willReturn(Optional.empty());
+        given(studentProfileRepository.findById("student-123")).willReturn(Optional.of(sampleStudent));
         given(profileReviewRepository.findByStudentId(any(String.class), any(Pageable.class))).willReturn(page);
 
         PageResponse<ProfileReview> response = profileReviewService.getReviewsForStudent("student-123", 0, 10);
@@ -103,7 +103,7 @@ class ProfileReviewServiceTest {
 
     @Test
     void testGetReviewSummaryCalculatesBreakdown() {
-        given(studentProfileRepository.findByUserId("student-123")).willReturn(Optional.empty());
+        given(studentProfileRepository.findById("student-123")).willReturn(Optional.of(sampleStudent));
         given(profileReviewRepository.getAverageRating("student-123")).willReturn(4.67);
         given(profileReviewRepository.countByStudentId("student-123")).willReturn(3L);
 
@@ -137,5 +137,34 @@ class ProfileReviewServiceTest {
         assertEquals(0.0, sampleStudent.getRating());
         assertEquals(0, sampleStudent.getReviewCount());
     }
-}
 
+    @Test
+    void testAddReviewRejectsDuplicateReviewFromSameReviewer() {
+        given(studentProfileRepository.findById("student-123")).willReturn(Optional.of(sampleStudent));
+        given(profileReviewRepository.existsByStudentIdAndReviewerIdAndProjectIdIsNull("student-123", "startup-1"))
+                .willReturn(true);
+
+        CreateReviewDto dto = CreateReviewDto.builder()
+                .reviewerId("startup-1").reviewerName("Acme").rating(4).build();
+
+        assertThrows(IllegalStateException.class, () -> profileReviewService.addReview("student-123", dto));
+    }
+
+    @Test
+    void testAddReviewRejectsSelfReview() {
+        given(studentProfileRepository.findById("student-123")).willReturn(Optional.of(sampleStudent));
+
+        CreateReviewDto dto = CreateReviewDto.builder()
+                .reviewerId("user-123").reviewerName("Me").rating(5).build();
+
+        assertThrows(IllegalArgumentException.class, () -> profileReviewService.addReview("student-123", dto));
+    }
+
+    @Test
+    void testGetReviewSummaryThrowsForUnknownStudent() {
+        given(studentProfileRepository.findById("ghost")).willReturn(Optional.empty());
+        given(studentProfileRepository.findByUserId("ghost")).willReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> profileReviewService.getReviewSummary("ghost"));
+    }
+}

@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Getter
+@lombok.Setter
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class MilestoneResponse {

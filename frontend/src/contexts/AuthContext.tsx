@@ -133,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headline: data.headline || cachedUser?.headline || (role === 'STUDENT' ? 'Student Developer' : 'Startup Client'),
         skills: data.skills || cachedUser?.skills || (role === 'STUDENT' ? ['React', 'TypeScript', 'Node.js'] : []),
         profileId: data.profileId,
-        rating: data.rating || 4.9,
+        rating: data.rating ?? 0,
       }
       persistAuth(data.token || data.accessToken, userProfile)
       toast.success(`Welcome back, ${userProfile.name}! (${role === 'STUDENT' ? 'Student' : 'Startup'})`)
@@ -186,7 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         bio: payload.bio,
         skills: data.skills || payload.skills || [],
         profileId: data.profileId,
-        rating: data.rating || 5.0,
+        rating: data.rating ?? 0,
       }
       persistAuth(data.token || data.accessToken, userProfile)
       toast.success(`Account created! Welcome to DevCollab, ${userProfile.name}`)

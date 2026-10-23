@@ -14,10 +14,28 @@ import {
 import { discoveryApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { SkillGapAnalysis, SkillGapPanel } from '../components/SkillGapPanel'
+import { RatingBadge } from '../components/StarRating'
+import { StudentProfileModal, StudentProfileData, displayName } from '../components/StudentProfileModal'
+import { recordProfileView } from '../utils/viewedProfiles'
 import toast from 'react-hot-toast'
+
+interface SimilarProject {
+  project: { id: string; title: string; category: string; budget: number; currency?: string }
+  similarityScore: number
+  sharedSkills: string[]
+}
+
+interface CandidateRecommendation {
+  student: StudentProfileData
+  matchScore: number
+  matchingSkills: string[]
+  missingSkills: string[]
+  fitReason: string
+}
 
 interface Project {
   id: string
+  startupId?: string
   title: string
   description: string
   category: string
@@ -37,6 +55,39 @@ export const ProjectDetail: React.FC = () => {
   const [matching, setMatching] = useState(false)
   const [skillGap, setSkillGap] = useState<SkillGapAnalysis | null>(null)
   const [analyzingSkillGap, setAnalyzingSkillGap] = useState(false)
+  const [similarProjects, setSimilarProjects] = useState<SimilarProject[]>([])
+  const [candidates, setCandidates] = useState<CandidateRecommendation[]>([])
+  const [selectedCandidate, setSelectedCandidate] = useState<StudentProfileData | null>(null)
+
+  useEffect(() => {
+    if (!id) return
+    setSimilarProjects([])
+    discoveryApi
+      .getSimilarProjects(id, 4)
+      .then((res) => {
+        const list: SimilarProject[] = res.data?.data ?? []
+        setSimilarProjects(list.filter((s) => s.similarityScore > 0))
+      })
+      .catch(() => setSimilarProjects([]))
+  }, [id])
+
+  const isOwner = Boolean(project && (role === 'ADMIN' || (role === 'STARTUP' && project.startupId === user?.id)))
+
+  useEffect(() => {
+    if (!id || !isOwner || project?.status !== 'OPEN') {
+      setCandidates([])
+      return
+    }
+    discoveryApi
+      .getCandidatesForProject(id, 5)
+      .then((res) => setCandidates(res.data?.data ?? []))
+      .catch(() => setCandidates([]))
+  }, [id, isOwner, project?.status])
+
+  const openCandidate = (student: StudentProfileData) => {
+    setSelectedCandidate(student)
+    recordProfileView(student.id, user?.id)
+  }
 
   useEffect(() => {
     if (!id) return
@@ -285,6 +336,75 @@ export const ProjectDetail: React.FC = () => {
         </div>
         {skillGap && <SkillGapPanel analysis={skillGap} onClose={() => setSkillGap(null)} />}
       </div>
+
+      {candidates.length > 0 && (
+        <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 space-y-4">
+          <div>
+            <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-brand-400" /> Recommended candidates
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">Ranked by skill fit, review rating and hourly-rate fit with your budget.</p>
+          </div>
+          <div className="divide-y divide-white/5">
+            {candidates.map((c) => (
+              <div key={c.student.id} className="py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-white">{displayName(c.student)}</span>
+                    <RatingBadge rating={c.student.rating} reviewCount={c.student.reviewCount} />
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1">{c.fitReason}</div>
+                  {c.missingSkills.length > 0 && (
+                    <div className="text-[11px] text-amber-300/80 mt-0.5">Missing: {c.missingSkills.join(', ')}</div>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs font-bold text-emerald-400">{Math.round(c.matchScore)}% fit</span>
+                  <button
+                    type="button"
+                    onClick={() => openCandidate(c.student)}
+                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/10"
+                  >
+                    View profile
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {similarProjects.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Similar projects</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {similarProjects.map(({ project: p, similarityScore, sharedSkills }) => (
+              <Link
+                key={p.id}
+                to={`/projects/${p.id}`}
+                className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-brand-500/40 transition-all"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold uppercase text-brand-400 truncate">{p.category}</span>
+                  <span className="text-[10px] font-bold text-slate-400 shrink-0">{Math.round(similarityScore)}% similar</span>
+                </div>
+                <div className="text-sm font-semibold text-white mt-1.5 line-clamp-2">{p.title}</div>
+                <div className="text-[11px] text-slate-500 mt-1 truncate">
+                  ${Number(p.budget).toLocaleString()} {sharedSkills.length > 0 && `· ${sharedSkills.slice(0, 3).join(', ')}`}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedCandidate && (
+        <StudentProfileModal
+          student={selectedCandidate}
+          onClose={() => setSelectedCandidate(null)}
+          onSelectStudent={openCandidate}
+        />
+      )}
     </div>
   )
 }

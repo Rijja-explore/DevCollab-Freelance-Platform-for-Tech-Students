@@ -20,6 +20,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -166,18 +167,75 @@ class MatchingServiceTest {
     }
 
     @Test
-    void testMatchProjectSavesMatchAndPublishesEvent() {
+    void testApplyRecordsPendingApplicationWithoutPublishingEvent() {
         given(projectRepository.findById("proj-123")).willReturn(Optional.of(sampleProject));
+        given(matchRecordRepository.findByProjectId("proj-123")).willReturn(List.of());
         given(studentProfileRepository.findById("student-456")).willReturn(Optional.of(sampleStudent));
-        given(matchRecordRepository.findByProjectIdAndStudentId("proj-123", "student-456")).willReturn(Optional.empty());
+        given(matchRecordRepository.findByProjectIdAndStudentId("proj-123", "user-789")).willReturn(Optional.empty());
         given(matchRecordRepository.save(any(MatchRecord.class))).willAnswer(inv -> inv.getArgument(0));
 
-        MatchingService.MatchResult result = matchingService.matchProject("proj-123", "student-456");
+        MatchingService.MatchResult result = matchingService.applyForProject("proj-123", "student-456");
 
         assertNotNull(result);
         assertEquals("proj-123", result.getProjectId());
-        assertEquals("MATCHED", result.getStatus());
+        assertEquals("PENDING", result.getStatus());
+        assertEquals(ProjectStatus.OPEN, sampleProject.getStatus());
+        // Contract/workspace creation must wait for the startup's approval
+        verify(eventPublisher, never()).publishProjectMatched(any(), any());
+    }
+
+    @Test
+    void testApproveMatchMarksProjectMatchedAndPublishesEvent() {
+        MatchRecord pending = MatchRecord.builder()
+                .id("match-1")
+                .projectId("proj-123")
+                .startupId("startup-abc")
+                .studentId("user-789")
+                .matchScore(80.0)
+                .status("PENDING")
+                .build();
+        MatchRecord competitor = MatchRecord.builder()
+                .id("match-2")
+                .projectId("proj-123")
+                .startupId("startup-abc")
+                .studentId("user-other")
+                .matchScore(60.0)
+                .status("PENDING")
+                .build();
+        given(matchRecordRepository.findById("match-1")).willReturn(Optional.of(pending));
+        given(projectRepository.findById("proj-123")).willReturn(Optional.of(sampleProject));
+        given(matchRecordRepository.findByProjectId("proj-123")).willReturn(List.of(pending, competitor));
+
+        MatchingService.MatchResult result = matchingService.approveMatch("match-1", "startup-abc");
+
+        assertEquals("ACCEPTED", result.getStatus());
         assertEquals(ProjectStatus.MATCHED, sampleProject.getStatus());
-        verify(eventPublisher).publishProjectMatched(sampleProject, "student-456");
+        assertEquals("REJECTED", competitor.getStatus());
+        verify(eventPublisher).publishProjectMatched(sampleProject, "user-789");
+    }
+
+    @Test
+    void testStudentsSimilarToViewedExcludesViewedAndRanksBySharedSkills() {
+        StudentProfile peer = StudentProfile.builder()
+                .id("student-peer")
+                .fullName("Peer")
+                .skills(new HashSet<>(sampleStudent.getSkills()))
+                .hourlyRate(sampleStudent.getHourlyRate())
+                .build();
+        StudentProfile unrelated = StudentProfile.builder()
+                .id("student-unrelated")
+                .fullName("Unrelated")
+                .skills(Set.of("COBOL"))
+                .hourlyRate(BigDecimal.valueOf(35))
+                .build();
+        given(studentProfileRepository.findById("student-456")).willReturn(Optional.of(sampleStudent));
+        given(studentProfileRepository.findAll()).willReturn(List.of(sampleStudent, peer, unrelated));
+
+        List<MatchingService.SimilarStudentRecommendation> recs =
+                matchingService.getStudentsSimilarToViewed(List.of("student-456"), 5);
+
+        assertEquals(1, recs.size());
+        assertEquals("student-peer", recs.get(0).getStudent().getId());
+        assertFalse(recs.get(0).getSharedSkills().isEmpty());
     }
 }

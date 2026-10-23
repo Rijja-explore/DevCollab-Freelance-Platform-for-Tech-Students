@@ -66,7 +66,9 @@ public class ProjectMatchedConsumer {
                     payload.getProjectDescription(),
                     payload.getTotalBudget(),
                     payload.getCurrency(),
-                    milestoneDefs
+                    milestoneDefs,
+                    payload.getStartupEmail(),
+                    payload.getStudentEmail()
             );
 
             // Record as processed AFTER successful contract creation

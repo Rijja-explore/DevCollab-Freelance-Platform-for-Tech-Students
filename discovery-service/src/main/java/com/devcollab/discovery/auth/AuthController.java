@@ -58,7 +58,6 @@ public class AuthController {
                 p.setHeadline("Computer Science Student & Full Stack Developer");
                 p.setBio("Passionate about building scalable web apps and collaborative software.");
                 p.setHourlyRate(BigDecimal.valueOf(35.00));
-                p.setRating(4.9);
                 p.setSkills(new HashSet<>(List.of("React", "TypeScript", "Node.js", "PostgreSQL", "Spring Boot")));
                 return studentProfileRepository.save(p);
             });
@@ -189,7 +188,6 @@ public class AuthController {
                 p.setHeadline(request.getHeadline() != null ? request.getHeadline() : "Computer Science Student & Full Stack Developer");
                 p.setBio(request.getBio() != null ? request.getBio() : "Passionate about building scalable web apps and collaborative software.");
                 p.setHourlyRate(request.getHourlyRate() != null ? request.getHourlyRate() : BigDecimal.valueOf(35.00));
-                p.setRating(4.9);
                 if (request.getSkills() != null && !request.getSkills().isEmpty()) {
                     p.setSkills(new HashSet<>(request.getSkills()));
                 } else {

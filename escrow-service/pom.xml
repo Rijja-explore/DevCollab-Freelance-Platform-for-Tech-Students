@@ -92,6 +92,14 @@
         </dependency>
 
         <!-- ============================================================ -->
+        <!--  Mail — payment reminder emails                             -->
+        <!-- ============================================================ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- ============================================================ -->
         <!--  JWT (JJWT) — RS256 Support                                 -->
         <!-- ============================================================ -->
         <dependency>

@@ -20,6 +20,10 @@ public class StudentSearchCriteria {
     private Double maxRating;
     private BigDecimal minHourlyRate;
     private BigDecimal maxHourlyRate;
+    /** Case-insensitive substring match on the profile location (e.g. "Bangalore", "Remote"). */
+    private String location;
+    /** AVAILABLE, PART_TIME or UNAVAILABLE; may contain several values. */
+    private List<String> availability;
 
     @Builder.Default
     private int page = 0;
@@ -33,4 +37,3 @@ public class StudentSearchCriteria {
     @Builder.Default
     private String sortDirection = "desc";
 }
-

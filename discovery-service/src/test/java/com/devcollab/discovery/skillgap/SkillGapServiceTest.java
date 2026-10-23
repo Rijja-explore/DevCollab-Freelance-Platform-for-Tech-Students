@@ -48,7 +48,8 @@ class SkillGapServiceTest {
         assertEquals(0.5, result.coverage());
         assertEquals(SkillGapTypes.Severity.MEDIUM, result.severity());
         assertEquals(Set.of("FastAPI", "Docker"), Set.copyOf(result.missingSkills()));
-        assertEquals(4, result.recommendations().size());
+        // One best recommendation per missing skill (FastAPI, Docker)
+        assertEquals(2, result.recommendations().size());
         assertEquals("Missing FastAPI because project 'AI Logistics API' requires FastAPI.", result.explanations().stream().filter(text -> text.contains("FastAPI")).findFirst().orElseThrow());
     }
 
@@ -103,7 +104,9 @@ class SkillGapServiceTest {
         assertEquals(1, result.matchedSkills().size());
         assertEquals("docker", SkillGapService.normalizeSkill(result.matchedSkills().get(0)));
         assertEquals(Set.of("COBOL"), Set.copyOf(result.missingSkills()));
-        assertTrue(result.recommendations().isEmpty());
+        // Skills without a catalog course still get a search-based learning resource
+        assertEquals(1, result.recommendations().size());
+        assertEquals("COBOL", result.recommendations().get(0).skill());
     }
 
     @Test

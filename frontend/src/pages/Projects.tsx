@@ -40,6 +40,23 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
   const [showCreateModal, setShowCreateModal] = useState(defaultOpenModal)
   const [loading, setLoading] = useState(true)
   const [projectsList, setProjectsList] = useState<Project[]>([])
+  const [minBudget, setMinBudget] = useState('')
+  const [maxBudget, setMaxBudget] = useState('')
+  const [matchAllSkills, setMatchAllSkills] = useState(false)
+  const [sort, setSort] = useState('createdAt:desc')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [totalResults, setTotalResults] = useState(0)
+
+  // Debounce free-text inputs so we don't query on every keystroke
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [debouncedBudget, setDebouncedBudget] = useState({ min: '', max: '' })
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedQuery(searchQuery)
+      setDebouncedBudget({ min: minBudget, max: maxBudget })
+    }, 350)
+    return () => clearTimeout(t)
+  }, [searchQuery, minBudget, maxBudget])
 
   // Form State
   const [title, setTitle] = useState('')
@@ -65,30 +82,32 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
     setLoading(true)
     try {
       const isStudent = role === 'STUDENT'
-      if (searchQuery.trim() || selectedSkills.length > 0) {
-        const res = await discoveryApi.search(
-          searchQuery.trim() || undefined,
-          selectedSkills.length > 0 ? selectedSkills : undefined,
-          category === 'ALL' ? undefined : category
-        )
-        const data = res.data?.data ?? res.data ?? []
-        const list = Array.isArray(data) ? data : []
-        setProjectsList(isStudent ? list.filter((p: any) => p.status === 'OPEN') : list)
-      } else {
-        const cat = category === 'ALL' ? undefined : category
-        const statusParam = isStudent ? 'OPEN' : undefined
-        const res = await discoveryApi.getProjects(cat, statusParam)
-        const data = res.data?.data ?? res.data ?? []
-        const list = Array.isArray(data) ? data : []
-        setProjectsList(isStudent ? list.filter((p: any) => p.status === 'OPEN') : list)
-      }
+      const [sortBy, sortDirection] = sort.split(':') as ['createdAt' | 'budget' | 'title', 'asc' | 'desc']
+      // Students only see open opportunities; startups/admins can filter by status
+      const status = isStudent ? 'OPEN' : statusFilter === 'ALL' ? undefined : statusFilter
+      const res = await discoveryApi.advancedSearchProjects({
+        q: debouncedQuery.trim() || undefined,
+        category: category === 'ALL' ? undefined : category,
+        status,
+        skills: selectedSkills.length > 0 ? selectedSkills : undefined,
+        allSkills: selectedSkills.length > 1 ? matchAllSkills : undefined,
+        minBudget: debouncedBudget.min ? Number(debouncedBudget.min) : undefined,
+        maxBudget: debouncedBudget.max ? Number(debouncedBudget.max) : undefined,
+        sortBy,
+        sortDirection,
+        size: 60,
+      })
+      const data = res.data?.data ?? []
+      setProjectsList(Array.isArray(data) ? data : [])
+      setTotalResults(res.data?.totalElements ?? 0)
     } catch (err) {
       console.error('Error loading projects:', err)
       setProjectsList([])
+      setTotalResults(0)
     } finally {
       setLoading(false)
     }
-  }, [category, searchQuery, selectedSkills, role])
+  }, [category, debouncedQuery, selectedSkills, matchAllSkills, debouncedBudget, sort, statusFilter, role])
 
   useEffect(() => {
     loadProjects()
@@ -203,7 +222,7 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search projects by title or description..."
+              placeholder="Search projects by title, description or skill..."
               className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-brand-500 transition-all"
             />
           </div>
@@ -221,10 +240,69 @@ export const Projects: React.FC<{ defaultOpenModal?: boolean }> = ({ defaultOpen
           </select>
         </div>
 
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Budget</span>
+            <input
+              type="number"
+              min={0}
+              value={minBudget}
+              onChange={(e) => setMinBudget(e.target.value)}
+              placeholder="Min $"
+              aria-label="Minimum budget"
+              className="w-24 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
+            />
+            <span className="text-slate-500">–</span>
+            <input
+              type="number"
+              min={0}
+              value={maxBudget}
+              onChange={(e) => setMaxBudget(e.target.value)}
+              placeholder="Max $"
+              aria-label="Maximum budget"
+              className="w-24 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
+            />
+          </div>
+          {role !== 'STUDENT' && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter by status"
+              className="px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
+            >
+              <option value="ALL">All statuses</option>
+              <option value="OPEN">Open</option>
+              <option value="MATCHED">Matched</option>
+              <option value="IN_PROGRESS">In progress</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+          )}
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            aria-label="Sort projects"
+            className="px-3.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs focus:outline-none focus:border-brand-500"
+          >
+            <option value="createdAt:desc">Newest first</option>
+            <option value="budget:desc">Highest budget</option>
+            <option value="budget:asc">Lowest budget</option>
+            <option value="title:asc">Title A–Z</option>
+          </select>
+          <span className="text-[11px] text-slate-500 sm:ml-auto" aria-live="polite">
+            {!loading && `${totalResults} project${totalResults === 1 ? '' : 's'}`}
+          </span>
+        </div>
+
         {/* Tech Stack Filtering */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filter by Tech Stack</label>
+            {selectedSkills.length > 1 && (
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer ml-auto mr-3">
+                <input type="checkbox" checked={matchAllSkills} onChange={(e) => setMatchAllSkills(e.target.checked)} />
+                Must require all selected skills
+              </label>
+            )}
             {selectedSkills.length > 0 && (
               <button
                 type="button"

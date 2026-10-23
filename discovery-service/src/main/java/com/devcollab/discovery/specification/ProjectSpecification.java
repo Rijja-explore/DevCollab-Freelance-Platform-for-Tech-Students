@@ -4,12 +4,32 @@ import com.devcollab.discovery.dto.ProjectSearchCriteria;
 import com.devcollab.discovery.entity.Project;
 import com.devcollab.discovery.entity.ProjectStatus;
 import jakarta.persistence.criteria.*;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class ProjectSpecification {
+
+    /** Public sort keys mapped to entity properties; anything else falls back to createdAt. */
+    private static final Map<String, String> SORTABLE = Map.of(
+            "createdat", "createdAt",
+            "budget", "budget",
+            "title", "title",
+            "category", "category",
+            "updatedat", "updatedAt"
+    );
+
+    public static Sort sort(ProjectSearchCriteria criteria) {
+        String key = criteria.getSortBy() != null ? criteria.getSortBy().trim().toLowerCase() : "";
+        String property = SORTABLE.getOrDefault(key, "createdAt");
+        Sort.Direction direction = "asc".equalsIgnoreCase(criteria.getSortDirection())
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+        return Sort.by(direction, property).and(Sort.by("id"));
+    }
 
     public static Specification<Project> build(ProjectSearchCriteria criteria) {
         return (root, query, cb) -> {
